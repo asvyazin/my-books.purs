@@ -14,9 +14,6 @@ type Model =
   }
 
 
-data Action = Action
-
-
 initialState :: Model
 initialState =
   { title: "MyBooks"
@@ -25,7 +22,7 @@ initialState =
   }
 
               
-render :: T.Render Model _ Action
+render :: T.Render Model _ _
 render dispatch _ state _ =
   [ R.nav
     [ RP.className "navbar navbar-default"
@@ -45,5 +42,5 @@ render dispatch _ state _ =
   ]
 
 
-spec :: T.Spec _ Model _ Action
+spec :: T.Spec _ Model _ _
 spec = T.simpleSpec T.defaultPerformAction render

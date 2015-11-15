@@ -29,24 +29,14 @@ header :: LensP Model H.Model
 header = lens _.header (_ { header = _ })
 
 
-data Action =
-  HeaderAction H.Action
-
-
-_HeaderAction :: PrismP Action H.Action
-_HeaderAction = prism HeaderAction getter
-  where
-    getter (HeaderAction a) = Right a
-
-
 initialState :: Model
 initialState =
   { header : H.initialState
   }
 
 
-spec :: T.Spec _ Model _ Action
-spec = T.focus header _HeaderAction H.spec
+spec :: T.Spec _ Model _ _
+spec = T.focusState header H.spec
 
 
 main :: Eff (dom :: DOM) Unit
