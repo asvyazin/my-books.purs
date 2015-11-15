@@ -1,0 +1,10 @@
+/bower_components/
+/node_modules/
+/output/
+/.psci*
+/src/.webpack.js
+bundle.js
+.cabal-sandbox
+cabal.sandbox.config
+*~
+dist

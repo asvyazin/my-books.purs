@@ -1,0 +1,20 @@
+{
+  "name": "my-books.ps",
+  "version": "0.1.0",
+  "description": "purescript experiment",
+  "scripts": {
+    "pulp": "pulp",
+    "bower": "bower"
+  },
+  "keywords": [
+    "purescript",
+    "experiment",
+    "learning"
+  ],
+  "author": "Alexander Svyazin <guybrush@live.ru>",
+  "license": "MPL-2.0",
+  "devDependencies": {
+    "bower": "^1.6.5",
+    "pulp": "^4.4.1"
+  }
+}
