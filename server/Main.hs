@@ -14,8 +14,8 @@ ie10comment htmlContent = H.textComment $ T.concat ["[if lt IE 10]>", content, "
   where content = renderHtml htmlContent
 
 
-withMaster :: H.Html -> H.Html
-withMaster children = H.docTypeHtml $ do
+withMaster :: T.Text -> H.Html -> H.Html
+withMaster mainScript children = H.docTypeHtml $ do
   H.head $ do
     H.meta H.! HA.charset "UTF-8"
     H.title "My Books"
@@ -30,25 +30,32 @@ withMaster children = H.docTypeHtml $ do
     children
     H.script H.! HA.src "/bower_components/react/react.min.js" $ ""
     H.script H.! HA.src "/bower_components/react/react-dom.min.js" $ ""
-    H.script H.! HA.src "/bundle.js" $ ""
+    H.script H.! HA.src (H.toValue mainScript) $ ""
 
 
 indexPage :: H.Html
 indexPage =
-  withMaster $ H.div H.! HA.class_ "application" $ ""
+  withMaster "/public/js/main.js" $ H.div H.! HA.class_ "application" $ ""
 
 
 loginPage :: H.Html
 loginPage =
-  withMaster $ H.div H.! HA.class_ "application" $ ""
+  withMaster "/public/js/login.js" $ H.div H.! HA.class_ "application" $ ""
 
 
 renderHtml :: H.Html -> T.Text
-renderHtml = TL.toStrict . H.renderHtml
+renderHtml =
+  TL.toStrict . H.renderHtml
 
 
 main :: IO ()
 main = runSpock 8000 $ spockT id $ do
   middleware Wai.static
-  get "/" $ html $ renderHtml indexPage
+  get "/" $ do
+    onedriveTokenCookie <- cookie "onedriveToken"
+    case onedriveTokenCookie of
+      Just _ ->
+        html $ renderHtml indexPage
+      _ ->
+        redirect "/login"
   get "login" $ html $ renderHtml loginPage

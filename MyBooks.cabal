@@ -19,6 +19,11 @@ executable MyBooks
   main-is:             Main.hs
   -- other-modules:       
   -- other-extensions:    
-  build-depends:       base >=4.8 && <4.9, Spock >=0.10.0.1 && <0.11, wai-middleware-static >=0.8.0 && <0.9, blaze-html >= 0.8.1.1 && <0.9, text >=1.2.1.3 && <1.3
+  build-depends:       base >=4.8 && <4.9,
+                       Spock >=0.10.0.1 && <0.11,
+                       wai-middleware-static >=0.8.0 && <0.9,
+                       blaze-html >= 0.8.1.1 && <0.9,
+                       text >=1.2.1.3 && <1.3,
+                       http-conduit >=2.1.8 && <2.2
   hs-source-dirs:      server
   default-language:    Haskell2010

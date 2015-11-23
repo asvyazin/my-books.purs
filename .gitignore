@@ -8,3 +8,5 @@ bundle.js
 cabal.sandbox.config
 *~
 dist
+public
+tmp

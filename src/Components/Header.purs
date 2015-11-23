@@ -1,24 +1,18 @@
-module Header where
+module Components.Header where
 
+import Data.Array
 import Data.Maybe
-import qualified Thermite as T
+import Prelude
 import qualified React as R
 import qualified React.DOM as R
 import qualified React.DOM.Props as RP
+import qualified Thermite as T
 
 
 type Model =
   { title :: String
   , userName :: Maybe String
   , error :: Maybe String
-  }
-
-
-initialState :: Model
-initialState =
-  { title: "MyBooks"
-  , userName: Nothing
-  , error: Nothing
   }
 
               
@@ -38,9 +32,21 @@ render dispatch _ state _ =
           [ R.text "Get new access token" ]
         ]
       ]
+    , R.ul
+      [ RP.className "nav navbar-nav navbar-right" ]
+      [ R.li'
+        (catMaybes [ renderUserName <$> state.userName
+                   , renderError <$> state.error ])
+      ]
     ]
   ]
+  where
+    renderUserName user =
+      R.div [ RP.className "navbar-text" ] [ R.text user ]
+    renderError error =
+      R.div [ RP.className "alert alert-danger" ] [ R.text error ]
 
 
 spec :: T.Spec _ Model _ _
-spec = T.simpleSpec T.defaultPerformAction render
+spec =
+  T.simpleSpec T.defaultPerformAction render
