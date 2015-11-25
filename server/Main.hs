@@ -1,7 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+import Control.Monad.IO.Class
+import Data.Maybe
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
+import Network.Wai
 import qualified Network.Wai.Middleware.Static as Wai
 import qualified Text.Blaze.Html.Renderer.Text as H
 import qualified Text.Blaze.Html5 as H
@@ -51,6 +54,7 @@ renderHtml =
 main :: IO ()
 main = runSpock 8000 $ spockT id $ do
   middleware Wai.static
+  
   get "/" $ do
     onedriveTokenCookie <- cookie "onedriveToken"
     case onedriveTokenCookie of
@@ -58,4 +62,17 @@ main = runSpock 8000 $ spockT id $ do
         html $ renderHtml indexPage
       _ ->
         redirect "/login"
+        
   get "login" $ html $ renderHtml loginPage
+  
+  get "onedrive-redirect" $ do
+    qs <- queryString <$> request
+    let code = fromJust $ param "code" qs
+    liftIO $ print code
+    redirect "/login"
+
+  where
+    param _ [] = Nothing
+    param par ((p, v) : qs)
+      | p == par = Just v
+      | otherwise = param par qs

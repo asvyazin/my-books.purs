@@ -3,9 +3,12 @@ module Entries.Login where
 import Control.Monad.Eff
 import Data.Either
 import Data.Lens
+import Data.List
 import Data.Maybe
 import Data.Maybe.Unsafe
 import Data.Nullable
+import Data.String (joinWith)
+import Data.Tuple
 import DOM
 import DOM.HTML
 import DOM.HTML.Document
@@ -23,6 +26,8 @@ import qualified Components.Header as H
 
 type Model =
   { header :: H.Model
+  , clientId :: String
+  , scope :: String
   }
 
 
@@ -32,7 +37,7 @@ render dispatch _ state _ =
     [ RP.className "col-md-offset-5 col-md-2" ]
     [ R.a
       [ RP.className "btn btn-default btn-lg"
-      , RP.href "http://onedrive.login.url"
+      , RP.href loginUrl
       ]
       [ R.span
         [ RP.className "glyphicon glyphicon-cloud" ]
@@ -41,6 +46,28 @@ render dispatch _ state _ =
       ]
     ]
   ]
+  where
+    loginParams =
+      [ (Tuple "client_id" state.clientId)
+      , (Tuple "scope" state.scope)
+      , (Tuple "response_type" "code")
+      , (Tuple "redirect_uri" "http://localhost:8000/onedrive-redirect")
+      ]
+    loginUrl =
+      buildUrl "https://login.live.com/oauth20_authorize.srf" $ toList loginParams 
+
+
+buildUrl :: String -> List (Tuple String String) -> String
+buildUrl baseUrl Nil =
+  baseUrl
+buildUrl baseUrl params =
+  baseUrl ++ "?" ++ queryString
+  where
+    formatParam (Tuple p v) =
+      p ++ "=" ++ v
+      
+    queryString =
+      joinWith "&" $ fromList $ map formatParam params
 
 
 header :: LensP Model H.Model
@@ -55,6 +82,8 @@ initialState =
     , userName : Nothing
     , error : Nothing
     }
+  , scope : "wl.signin onedrive.readonly"
+  , clientId : "000000004816D42C"
   }
 
 
