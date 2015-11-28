@@ -1,15 +1,24 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-import Control.Monad.IO.Class
+import Control.Monad.Catch
+import Control.Monad.Trans.Class
 import Data.Maybe
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 import qualified Data.Text.Lazy as TL
+import qualified  Network.HTTP.Client.Conduit as C
 import Network.Wai
 import qualified Network.Wai.Middleware.Static as Wai
 import qualified Text.Blaze.Html.Renderer.Text as H
 import qualified Text.Blaze.Html5 as H
 import qualified Text.Blaze.Html5.Attributes as HA
 import Web.Spock
+
+import Onedrive
+
+
+instance (MonadThrow m) => MonadThrow (ActionCtxT ctx m) where
+  throwM e = lift $ throwM e
 
 
 ie10comment :: H.Html -> H.Html
@@ -51,6 +60,14 @@ renderHtml =
   TL.toStrict . H.renderHtml
 
 
+onedriveClientId :: T.Text
+onedriveClientId = "000000004816D42C"
+
+
+onedriveClientSecret :: T.Text
+onedriveClientSecret = "-4tKnVPaAyIEAgYrBp8R6jTYY0zClN6c"
+
+
 main :: IO ()
 main = runSpock 8000 $ spockT id $ do
   middleware Wai.static
@@ -67,12 +84,20 @@ main = runSpock 8000 $ spockT id $ do
   
   get "onedrive-redirect" $ do
     qs <- queryString <$> request
-    let code = fromJust $ param "code" qs
-    liftIO $ print code
-    redirect "/login"
+    let c = pa "code" qs
+    let req =
+          OauthTokenRequest
+          { clientId = onedriveClientId
+          , redirectUri = "http://localhost:8000/onedrive-redirect"
+          , clientSecret = onedriveClientSecret
+          , code = T.decodeUtf8 $ fromJust c
+          }
+    tokenResp <- C.withManager $ oauthTokenRequest req
+    setCookie "onedriveToken" (accessToken tokenResp) defaultCookieSettings
+    redirect "/"
 
   where
-    param _ [] = Nothing
-    param par ((p, v) : qs)
-      | p == par = Just v
-      | otherwise = param par qs
+    pa _ [] = Nothing
+    pa par ((p, v) : qs)
+      | p == par = v
+      | otherwise = pa par qs
