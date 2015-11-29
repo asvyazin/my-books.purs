@@ -79,7 +79,7 @@ main = runSpock 8000 $ spockT id $ do
     onedriveTokenCookie <- cookie "onedriveToken"
     case onedriveTokenCookie of
       Just _ -> do
-        rendered <- render "public/js/index-server.js"
+        rendered <- render "public/js/index-server.js" "Entries.Index.Server"
         html $ renderHtml $ indexPage $ fromJust rendered
       _ ->
         redirect "/login"

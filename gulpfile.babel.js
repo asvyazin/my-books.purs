@@ -1,6 +1,5 @@
 import gulp from "gulp";
 import purescript from "gulp-purescript";
-import webpack from "webpack-stream";
 
 
 let mySources = [
@@ -32,22 +31,13 @@ gulp.task("make", function() {
 
 let mkBundleTask = function (name, main) {
 
-  gulp.task("prebundle-" + name, ["make"], function() {
+  gulp.task("bundle-" + name, ["make"], function() {
     return purescript.pscBundle({
       src: "output/**/*.js",
-      output: "tmp/js/" + name + ".js",
+      output: "public/js/" + name + ".js",
       module: main,
       main: main
     });
-  });
-
-  gulp.task("bundle-" + name, ["prebundle-" + name], function () {
-    return gulp.src("tmp/js/" + name + ".js")
-      .pipe(webpack({
-        resolve: { modulesDirectories: ["node_modules"] },
-        output: { filename: name + ".js" }
-      }))
-      .pipe(gulp.dest("public/js"));
   });
 
   return "bundle-" + name;
@@ -56,14 +46,12 @@ let mkBundleTask = function (name, main) {
 
 let mkBundleServerTask = function (name, main) {
 
-    gulp.task("bundle-" + name, ["make"], function () {
-	let srcFilename = "output/" + main + "/" + name + ".js";
-	return gulp.src(srcFilename)
-	    .pipe(webpack({
-		resolve : { modulesDirectories: ["output"] },
-		output : { filename: name + "-server.js" }
-	    }))
-	    .pipe(gulp.dest("public/js"));
+    gulp.task("bundle-" + name, ["make"], function() {
+	return purescript.pscBundle({
+	    src: "output/**/*.js",
+	    output: "public/js/" + name + ".js",
+	    module: main
+	});
     });
 
     return "bundle-" + name;
@@ -72,7 +60,7 @@ let mkBundleServerTask = function (name, main) {
 
 gulp.task("bundle", [
     mkBundleTask("index", "Entries.Index"),
-    mkBundleServerTask("index", "Entries.Index.Server"),
+    mkBundleServerTask("index-server", "Entries.Index.Server"),
     mkBundleTask("login", "Entries.Login")
 ]);
 

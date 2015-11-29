@@ -8,7 +8,3 @@ import Entries.Index.Class
 render :: String
 render =
   R.renderToString (R.createFactory component {})
-
-
-main =
-  void

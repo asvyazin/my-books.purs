@@ -5,8 +5,7 @@ module ReactRender where
 import Control.Lens
 import Control.Monad.IO.Class
 import Data.Aeson.Lens
-import qualified Data.ByteString as B
-import Data.Maybe
+import qualified Data.ByteString.Char8 as B
 import qualified Data.Text as T
 import Scripting.Duktape
 
@@ -18,19 +17,34 @@ reactModules =
   ]
 
 
-render :: (MonadIO m) => String -> m (Maybe T.Text)
-render jsFilename =
-  createDuktapeCtx >>= mapM (\ctx -> do
-    mapM_ (evalModule ctx) reactModules
-    jsFile <- liftIO $ B.readFile jsFilename
-    jsResult <- evalDuktape ctx jsFile
-    let result = fromJust $ either (const Nothing) id jsResult
-    return (fromJust (result ^? key "render" . _String)))
+render :: (MonadIO m) => String -> String -> m (Maybe T.Text)
+render jsFilename mainModule = do
+  ctxm <- createDuktapeCtx
+  case ctxm of
+    Nothing ->
+      return Nothing
+      
+    Just ctx -> do
+      mapM_ (evalModule ctx) reactModules
+      jsFile <- liftIO $ B.readFile jsFilename
+      jsResult <- evalDuktape ctx jsFile
+      case jsResult of
+        Left err ->
+          fail err
+        Right _ -> do
+          jsResult2 <- evalDuktape ctx $ B.pack $ "PS['" ++ mainModule ++ "']"
+          case jsResult2 of
+            Left err ->
+              fail err
+            Right Nothing ->
+              return Nothing
+            Right (Just result) ->
+              return (result ^? key "render" . _String)
   where
     evalModule ctx moduleFilename = do
       moduleFile <- liftIO (B.readFile moduleFilename)
-      result <- evalDuktape ctx moduleFile
-      case result of
+      moduleResult <- evalDuktape ctx moduleFile
+      case moduleResult of
         Left err ->
           fail err
         Right _ ->
