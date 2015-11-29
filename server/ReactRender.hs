@@ -6,8 +6,8 @@ import Control.Lens
 import Control.Monad.IO.Class
 import Data.Aeson.Lens
 import qualified Data.ByteString.Char8 as B
-import qualified Data.Text as T
 import Scripting.Duktape
+import Text.Blaze
 
 
 reactModules :: [String]
@@ -17,12 +17,12 @@ reactModules =
   ]
 
 
-render :: (MonadIO m) => String -> String -> m (Maybe T.Text)
+render :: (MonadIO m) => String -> String -> m Markup
 render jsFilename mainModule = do
   ctxm <- createDuktapeCtx
   case ctxm of
     Nothing ->
-      return Nothing
+      return ""
       
     Just ctx -> do
       mapM_ (evalModule ctx) reactModules
@@ -37,9 +37,9 @@ render jsFilename mainModule = do
             Left err ->
               fail err
             Right Nothing ->
-              return Nothing
+              return ""
             Right (Just result) ->
-              return (result ^? key "render" . _String)
+              return (maybe "" preEscapedToMarkup (result ^? key "render" . _String))
   where
     evalModule ctx moduleFilename = do
       moduleFile <- liftIO (B.readFile moduleFilename)

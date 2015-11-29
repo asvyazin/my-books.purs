@@ -48,9 +48,9 @@ withMaster mainScript children = H.docTypeHtml $ do
     H.script H.! HA.src (H.toValue mainScript) $ ""
 
 
-indexPage :: T.Text -> H.Html
+indexPage :: H.Html -> H.Html
 indexPage rendered =
-  withMaster "/public/js/index.js" $ H.div H.! HA.class_ "application" $ H.preEscapedToMarkup rendered
+  withMaster "/public/js/index.js" $ H.div H.! HA.class_ "application" $ rendered
 
 
 loginPage :: H.Html
@@ -80,7 +80,7 @@ main = runSpock 8000 $ spockT id $ do
     case onedriveTokenCookie of
       Just _ -> do
         rendered <- render "public/js/index-server.js" "Entries.Index.Server"
-        html $ renderHtml $ indexPage $ fromJust rendered
+        html $ renderHtml $ indexPage rendered
       _ ->
         redirect "/login"
         
