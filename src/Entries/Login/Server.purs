@@ -1,8 +1,8 @@
-module Entries.Index.Server where
+module Entries.Login.Server where
 
 
 import qualified React as R
-import Entries.Index.Class
+import Entries.Login.Class
 
 
 serverSideRender :: String

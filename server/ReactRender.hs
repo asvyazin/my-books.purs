@@ -39,7 +39,7 @@ render jsFilename mainModule = do
             Right Nothing ->
               return ""
             Right (Just result) ->
-              return (maybe "" preEscapedToMarkup (result ^? key "render" . _String))
+              return (maybe "" preEscapedToMarkup (result ^? key "serverSideRender" . _String))
   where
     evalModule ctx moduleFilename = do
       moduleFile <- liftIO (B.readFile moduleFilename)

@@ -61,7 +61,8 @@ let mkBundleServerTask = function (name, main) {
 gulp.task("bundle", [
     mkBundleTask("index", "Entries.Index"),
     mkBundleServerTask("index-server", "Entries.Index.Server"),
-    mkBundleTask("login", "Entries.Login")
+    mkBundleTask("login", "Entries.Login"),
+    mkBundleServerTask("login-server", "Entries.Login.Server")
 ]);
 
 
@@ -80,7 +81,8 @@ let allSources = sources.concat(jsSources);
 gulp.task("watch", [
     mkWatch("watch-index", "bundle-index", allSources),
     mkWatch("watch-index-server", "bundle-index-server", allSources),
-    mkWatch("watch-login", "bundle-login", allSources)
+    mkWatch("watch-login", "bundle-login", allSources),
+    mkWatch("watch-login-server", "bundle-login-server", allSources)
 ]);
 
 
