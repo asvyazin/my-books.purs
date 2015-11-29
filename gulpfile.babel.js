@@ -54,8 +54,25 @@ let mkBundleTask = function (name, main) {
 };
 
 
+let mkBundleServerTask = function (name, main) {
+
+    gulp.task("bundle-" + name, ["make"], function () {
+	let srcFilename = "output/" + main + "/" + name + ".js";
+	return gulp.src(srcFilename)
+	    .pipe(webpack({
+		resolve : { modulesDirectories: ["output"] },
+		output : { filename: name + "-server.js" }
+	    }))
+	    .pipe(gulp.dest("public/js"));
+    });
+
+    return "bundle-" + name;
+};
+
+
 gulp.task("bundle", [
-    mkBundleTask("main", "Entries.Main"),
+    mkBundleTask("index", "Entries.Index"),
+    mkBundleServerTask("index", "Entries.Index.Server"),
     mkBundleTask("login", "Entries.Login")
 ]);
 
@@ -73,7 +90,8 @@ let allSources = sources.concat(jsSources);
 
 
 gulp.task("watch", [
-    mkWatch("watch-main", "bundle-main", allSources),
+    mkWatch("watch-index", "bundle-index", allSources),
+    mkWatch("watch-index-server", "bundle-index-server", allSources),
     mkWatch("watch-login", "bundle-login", allSources)
 ]);
 

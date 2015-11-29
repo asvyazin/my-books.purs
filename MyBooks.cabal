@@ -34,6 +34,10 @@ executable MyBooks
                        exceptions >= 0.8.0.2 && <0.9,
                        conduit >= 1.2.5.1 && <1.3,
                        mtl >=2.2.1 && <2.3,
-                       attoparsec >=0.13.0.1 && <0.14
+                       attoparsec >=0.13.0.1 && <0.14,
+                       hs-duktape,
+                       lens-aeson >= 1.0.0.5 && <1.1,
+                       lens >=4.13 && <4.14,
+                       blaze-markup >=0.7.0.3 && <0.8
   hs-source-dirs:      server
   default-language:    Haskell2010

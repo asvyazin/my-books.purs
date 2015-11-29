@@ -1,0 +1,3 @@
+[submodule "hs-duktape"]
+	path = hs-duktape
+	url = https://github.com/myfreeweb/hs-duktape.git

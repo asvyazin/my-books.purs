@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+import Control.Monad
 import Control.Monad.Catch
 import Control.Monad.Trans.Class
 import Data.Maybe
@@ -9,12 +10,14 @@ import qualified Data.Text.Lazy as TL
 import qualified  Network.HTTP.Client.Conduit as C
 import Network.Wai
 import qualified Network.Wai.Middleware.Static as Wai
+import qualified Text.Blaze as H
 import qualified Text.Blaze.Html.Renderer.Text as H
 import qualified Text.Blaze.Html5 as H
 import qualified Text.Blaze.Html5.Attributes as HA
 import Web.Spock
 
 import Onedrive
+import ReactRender
 
 
 instance (MonadThrow m) => MonadThrow (ActionCtxT ctx m) where
@@ -45,9 +48,9 @@ withMaster mainScript children = H.docTypeHtml $ do
     H.script H.! HA.src (H.toValue mainScript) $ ""
 
 
-indexPage :: H.Html
-indexPage =
-  withMaster "/public/js/main.js" $ H.div H.! HA.class_ "application" $ ""
+indexPage :: T.Text -> H.Html
+indexPage rendered =
+  withMaster "/public/js/index.js" $ H.div H.! HA.class_ "application" $ H.preEscapedToMarkup rendered
 
 
 loginPage :: H.Html
@@ -75,8 +78,9 @@ main = runSpock 8000 $ spockT id $ do
   get "/" $ do
     onedriveTokenCookie <- cookie "onedriveToken"
     case onedriveTokenCookie of
-      Just _ ->
-        html $ renderHtml indexPage
+      Just _ -> do
+        rendered <- render "public/js/index-server.js"
+        html $ renderHtml $ indexPage $ fromJust rendered
       _ ->
         redirect "/login"
         
