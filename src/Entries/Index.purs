@@ -5,14 +5,12 @@ import Data.Maybe.Unsafe
 import Data.Nullable
 import DOM
 import DOM.HTML
-import DOM.HTML.Document
 import DOM.HTML.Types
 import DOM.HTML.Window
 import DOM.Node.ParentNode
 import Prelude
 import qualified React as R
 
-import qualified Components.Header as H
 import Entries.Index.Class
 
 

@@ -1,11 +1,8 @@
 module Entries.Login.Class where
 
-import Data.Either
 import Data.Lens
 import Data.List
 import Data.Maybe
-import Data.Maybe.Unsafe
-import Data.Nullable
 import Data.String (joinWith)
 import Data.Tuple
 import Prelude
@@ -24,7 +21,7 @@ type Model =
   }
 
 
-render :: T.Render Model _ _
+render :: forall props. T.Render Model props (Array R.ReactElement)
 render dispatch _ state _ =
   [ R.div
     [ RP.className "col-md-offset-5 col-md-2" ]
@@ -80,11 +77,11 @@ initialState =
   }
 
 
-spec :: T.Spec _ Model _ _
+spec :: forall eff props. T.Spec eff Model props (Array R.ReactElement)
 spec =
   T.focusState header H.spec <> T.simpleSpec T.defaultPerformAction render
 
 
-component :: R.ReactClass _
+component :: forall a. R.ReactClass a
 component =
   T.createClass spec initialState

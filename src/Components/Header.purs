@@ -16,7 +16,7 @@ type Model =
   }
 
               
-render :: T.Render Model _ _
+render :: forall props. T.Render Model props (Array R.ReactElement)
 render dispatch _ state _ =
   [ R.nav
     [ RP.className "navbar navbar-default"
