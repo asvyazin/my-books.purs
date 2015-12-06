@@ -47,6 +47,6 @@ render dispatch _ state _ =
       R.div [ RP.className "alert alert-danger" ] [ R.text error ]
 
 
-spec :: T.Spec _ Model _ _
+spec :: forall eff props. T.Spec eff Model props (Array R.ReactElement)
 spec =
   T.simpleSpec T.defaultPerformAction render

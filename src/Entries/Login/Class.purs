@@ -82,6 +82,6 @@ spec =
   T.focusState header H.spec <> T.simpleSpec T.defaultPerformAction render
 
 
-component :: forall a. R.ReactClass a
+component :: forall props. R.ReactClass props
 component =
   T.createClass spec initialState

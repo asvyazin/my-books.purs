@@ -2,10 +2,11 @@
 module ReactRender where
 
 
-import Control.Lens
 import Control.Monad.IO.Class
-import Data.Aeson.Lens
+import Data.Aeson
+import Data.Aeson.Encode
 import qualified Data.ByteString.Char8 as B
+import Data.Text.Lazy.Builder
 import Scripting.Duktape
 import Text.Blaze
 
@@ -17,8 +18,8 @@ reactModules =
   ]
 
 
-render :: (MonadIO m) => String -> String -> m Markup
-render jsFilename mainModule = do
+render :: (MonadIO m) => String -> String -> [Value] -> m Markup
+render jsFilename mainModule args = do
   ctxm <- createDuktapeCtx
   case ctxm of
     Nothing ->
@@ -32,14 +33,14 @@ render jsFilename mainModule = do
         Left err ->
           fail err
         Right _ -> do
-          jsResult2 <- evalDuktape ctx $ B.pack $ "PS['" ++ mainModule ++ "']"
+          jsResult2 <- callPurescriptFunc ctx mainModule "serverSideRender" args
           case jsResult2 of
             Left err ->
               fail err
             Right Nothing ->
               return ""
             Right (Just result) ->
-              return (maybe "" preEscapedToMarkup (result ^? key "serverSideRender" . _String))
+              return $ preEscapedToMarkup $ toLazyText $ encodeToTextBuilder result
   where
     evalModule ctx moduleFilename = do
       moduleFile <- liftIO (B.readFile moduleFilename)
@@ -49,3 +50,15 @@ render jsFilename mainModule = do
           fail err
         Right _ ->
           return ()
+
+
+callPurescriptFunc :: MonadIO m => DuktapeCtx -> String -> String -> [Value] -> m (Either String (Maybe Value))
+callPurescriptFunc ctx moduleName funcName arguments =
+  let
+    func = B.pack $ "PS['" ++ moduleName ++ "']." ++ funcName
+  in
+    case arguments of
+      [] -> 
+        evalDuktape ctx func
+      _ -> 
+        callDuktape ctx Nothing func arguments

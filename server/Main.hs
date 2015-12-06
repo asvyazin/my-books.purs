@@ -1,6 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-import Control.Monad
 import Control.Monad.Catch
 import Control.Monad.Trans.Class
 import Data.Maybe
@@ -53,9 +52,9 @@ indexPage rendered =
   withMaster "/public/js/index.js" $ H.div H.! HA.class_ "application" $ rendered
 
 
-loginPage :: H.Html
-loginPage =
-  withMaster "/public/js/login.js" $ H.div H.! HA.class_ "application" $ ""
+loginPage :: H.Html -> H.Html
+loginPage rendered =
+  withMaster "/public/js/login.js" $ H.div H.! HA.class_ "application" $ rendered
 
 
 renderHtml :: H.Html -> T.Text
@@ -79,12 +78,14 @@ main = runSpock 8000 $ spockT id $ do
     onedriveTokenCookie <- cookie "onedriveToken"
     case onedriveTokenCookie of
       Just _ -> do
-        rendered <- render "public/js/index-server.js" "Entries.Index.Server"
+        rendered <- render "public/js/index-server.js" "Entries.Index.Server" []
         html $ renderHtml $ indexPage rendered
       _ ->
         redirect "/login"
         
-  get "login" $ html $ renderHtml loginPage
+  get "login" $ do
+    rendered <- render "public/js/login-server.js" "Entries.Login.Server" []
+    html $ renderHtml $ loginPage rendered
   
   get "onedrive-redirect" $ do
     qs <- queryString <$> request

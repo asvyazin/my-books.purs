@@ -5,7 +5,6 @@ import Control.Monad.Catch
 import Control.Monad.IO.Class
 import Control.Monad.Reader.Class
 import Data.Aeson
-import Data.Aeson.Parser (json')
 import Data.Aeson.Types
 import qualified Data.Attoparsec.ByteString as A
 import qualified Data.ByteString as B

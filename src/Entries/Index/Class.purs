@@ -28,11 +28,11 @@ initialState =
   }
 
 
-spec :: T.Spec _ Model _ _
+spec :: forall eff props. T.Spec eff Model props (Array R.ReactElement)
 spec =
   T.focusState header H.spec
 
 
-component :: R.ReactClass _
+component :: forall props. R.ReactClass props
 component =
   T.createClass spec initialState
