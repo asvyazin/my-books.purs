@@ -2,12 +2,11 @@
 module ReactRender where
 
 
+import Control.Monad
 import Control.Monad.IO.Class
 import Data.Aeson
-import Data.Aeson.Encode
-import qualified Data.ByteString.Char8 as B
-import Data.Text.Lazy.Builder
 import Scripting.Duktape
+import Scripting.Duktape.Raw
 import Text.Blaze
 
 
@@ -19,46 +18,29 @@ reactModules =
 
 
 render :: (MonadIO m) => String -> String -> [Value] -> m Markup
-render jsFilename mainModule args = do
-  ctxm <- createDuktapeCtx
-  case ctxm of
-    Nothing ->
-      return ""
-      
-    Just ctx -> do
-      mapM_ (evalModule ctx) reactModules
-      jsFile <- liftIO $ B.readFile jsFilename
-      jsResult <- evalDuktape ctx jsFile
-      case jsResult of
-        Left err ->
-          fail err
-        Right _ -> do
-          jsResult2 <- callPurescriptFunc ctx mainModule "serverSideRender" args
-          case jsResult2 of
-            Left err ->
-              fail err
-            Right Nothing ->
-              return ""
-            Right (Just result) ->
-              return $ preEscapedToMarkup $ toLazyText $ encodeToTextBuilder result
-  where
-    evalModule ctx moduleFilename = do
-      moduleFile <- liftIO (B.readFile moduleFilename)
-      moduleResult <- evalDuktape ctx moduleFile
-      case moduleResult of
-        Left err ->
-          fail err
-        Right _ ->
-          return ()
+render jsFilename mainModule args =
+  liftIO $ do
+    ctx <- dukCreateHeapDefault
+    mapM_ (dukPEvalFileNoResult ctx) reactModules
+    dukEvalFileNoResult ctx jsFilename
+    jsResult <- callPurescriptFunc ctx mainModule "serverSideRender" args
+    return $ preEscapedToMarkup jsResult
 
 
-callPurescriptFunc :: MonadIO m => DuktapeCtx -> String -> String -> [Value] -> m (Either String (Maybe Value))
-callPurescriptFunc ctx moduleName funcName arguments =
-  let
-    func = B.pack $ "PS['" ++ moduleName ++ "']." ++ funcName
-  in
-    case arguments of
-      [] -> 
-        evalDuktape ctx func
-      _ -> 
-        callDuktape ctx Nothing func arguments
+callPurescriptFunc :: CDukContext -> String -> String -> [Value] -> IO String
+callPurescriptFunc ctx moduleName funcName arguments = do
+  guard =<< dukGetGlobalString ctx "PS"-- [PS]
+  guard =<< dukGetPropString ctx (-1) moduleName -- [PS, module]
+  case arguments of
+    [] ->
+      guard =<< dukGetPropString ctx (-1) funcName -- [PS, module, result]
+    _ -> do
+      void $ dukPushString ctx funcName -- [PS, module, funcname]
+      mapM_ (pushValue ctx) arguments -- [PS, module, funcname, arguments...]
+      let argsLen = length arguments
+      dukCallProp ctx (-2 - argsLen) argsLen -- [PS, module, result]
+  result <- dukGetString ctx (-1)
+  dukPop ctx
+  dukPop ctx
+  dukPop ctx
+  return result
