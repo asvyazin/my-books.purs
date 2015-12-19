@@ -1,7 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+import Control.Lens
 import Control.Monad.Catch
 import Control.Monad.Trans.Class
+import Data.Aeson
 import Data.Maybe
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -17,6 +19,7 @@ import Web.Spock
 
 import Onedrive
 import ReactRender
+import UserInfo
 
 
 instance (MonadThrow m) => MonadThrow (ActionCtxT ctx m) where
@@ -29,7 +32,7 @@ ie10comment htmlContent = H.textComment $ T.concat ["[if lt IE 10]>", content, "
 
 
 withMaster :: T.Text -> H.Html -> H.Html
-withMaster mainScript children = H.docTypeHtml $ do
+withMaster mainScript childrenMarkup = H.docTypeHtml $ do
   H.head $ do
     H.meta H.! HA.charset "UTF-8"
     H.title "My Books"
@@ -41,7 +44,7 @@ withMaster mainScript children = H.docTypeHtml $ do
       H.text " browser. Please "
       H.a H.! HA.href "http://browserhappy.com/" $ "upgrade your browser"
       H.text " to improve your experience."
-    children
+    childrenMarkup
     H.script H.! HA.src "/bower_components/react/react.min.js" $ ""
     H.script H.! HA.src "/bower_components/react/react-dom.min.js" $ ""
     H.script H.! HA.src (H.toValue mainScript) $ ""
@@ -77,8 +80,9 @@ main = runSpock 8000 $ spockT id $ do
   get "/" $ do
     onedriveTokenCookie <- cookie "onedriveToken"
     case onedriveTokenCookie of
-      Just _ -> do
-        rendered <- render "public/js/index-server.js" "Entries.Index.Server" []
+      Just token -> do
+        meUser <- C.withManager $ me token
+        rendered <- render "public/js/index-server.js" "Entries.Index.Server" [toJSON $ meUser ^. name]
         html $ renderHtml $ indexPage rendered
       _ ->
         redirect "/login"

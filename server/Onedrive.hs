@@ -1,10 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Onedrive where
 
+import Control.Lens
 import Control.Monad.Catch
 import Control.Monad.IO.Class
 import Control.Monad.Reader.Class
 import Data.Aeson
+import Data.Aeson.Lens
 import Data.Aeson.Types
 import qualified Data.Attoparsec.ByteString as A
 import qualified Data.ByteString as B
@@ -15,6 +17,7 @@ import qualified Data.Text.Encoding as T
 import Network.HTTP.Client.Conduit
 import Network.HTTP.Types.Header
 import Network.HTTP.Types.URI
+import UserInfo
 
 
 data OauthTokenRequest =
@@ -79,8 +82,10 @@ oauthTokenResponseParser :: A.Parser OauthTokenResponse
 oauthTokenResponseParser = do
   v <- json'
   case fromJSON v of
-    Success r -> return r
-    Error e -> fail e
+    Success r ->
+      return r
+    Error e ->
+      fail e
 
 
 oauthTokenRequest :: (MonadThrow m, MonadIO m, MonadReader env m, HasHttpManager env) => OauthTokenRequest -> m OauthTokenResponse
@@ -95,3 +100,28 @@ oauthTokenRequest req = do
       }
   httpResp <- responseOpen httpReq
   responseBody httpResp $$ sinkParser oauthTokenResponseParser
+
+
+me :: (MonadThrow m, MonadIO m, MonadReader env m, HasHttpManager env) => T.Text -> m UserInfo
+me token = do
+  initReq <- parseUrl "https://apis.live.net/v5.0/me"
+  let
+    qsParams =
+      [ ("access_token", Just $ T.encodeUtf8 token ) ]
+    httpReq =
+      initReq { queryString = renderQuery False qsParams }
+  httpResp <- responseOpen httpReq
+  responseBody httpResp $$ sinkParser userInfoParser
+
+
+mePictureLocation :: (MonadThrow m, MonadIO m, MonadReader env m, HasHttpManager env) => T.Text -> m T.Text
+mePictureLocation token = do
+  initReq <- parseUrl "https://apis.live.net/v5.0/me/picture"
+  let
+    qsParams =
+      [ ("access_token", Just $ T.encodeUtf8 token ) ]
+    httpReq =
+      initReq { queryString = renderQuery False qsParams }
+  httpResp <- responseOpen httpReq
+  v <- responseBody httpResp $$ sinkParser json'
+  return (v ^. key "location" . _String)

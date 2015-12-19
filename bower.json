@@ -13,10 +13,16 @@
   "dependencies": {
     "purescript-console": "^0.1.0",
     "purescript-thermite": "~0.11.0",
-    "purescript-affjax": "~0.9.0",
+    "purescript-affjax": "~0.10.0",
     "purescript-dom": "~0.2.8",
     "purescript-lens": "~0.9.0",
     "bootstrap": "~3.3.5",
-    "react": "~0.14.2"
+    "react": "~0.14.2",
+    "purescript-cookies": "~0.1.5",
+    "purescript-argonaut-codecs": "~0.5.0",
+    "purescript-exceptions": "~0.3.3"
+  },
+  "resolutions": {
+    "purescript-affjax": "~0.10.0"
   }
 }

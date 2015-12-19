@@ -17,7 +17,8 @@ cabal-version:       >=1.10
 
 executable MyBooks
   main-is:             Main.hs
-  other-modules:       Onedrive
+  other-modules:       Onedrive,
+                       UserInfo
   -- other-extensions:    
   build-depends:       base >=4.8 && <4.9,
                        Spock >=0.10.0.1 && <0.11,
