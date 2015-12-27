@@ -16,15 +16,20 @@ reactJsFiles =
  , "bower_components/react/react-dom.min.js" ]
 
 
+hsResult :: (MonadIO m) => CDukContext -> m Int -> m ()
+hsResult ctx func = do
+  res <- func
+  when (res /= 0) $ do
+     err <- liftIO $ dukSafeToLString ctx (-1)
+     fail err
+
+
 render :: (MonadIO m) => String -> [Value] -> m Markup
 render jsFilename args =
-  liftIO $ do 
+  liftIO $ do
     ctx <- dukCreateHeapDefault
-    forM_ reactJsFiles $ \jsFile -> do
-      res1 <- dukPEvalFile ctx jsFile
-      guard $ res1 == 0
-    res <- dukPEvalFile ctx jsFilename
-    guard $ res == 0
+    forM_ reactJsFiles $ \jsFile -> hsResult ctx $ dukPEvalFile ctx jsFile
+    hsResult ctx $ dukPEvalFile ctx jsFilename
     jsResult <- callPurescriptFunc ctx "serverSideRender" args
     return $ preEscapedToMarkup jsResult
 
