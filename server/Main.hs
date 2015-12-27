@@ -52,12 +52,12 @@ withMaster mainScript childrenMarkup = H.docTypeHtml $ do
 
 indexPage :: H.Html -> H.Html
 indexPage rendered =
-  withMaster "/public/js/index.js" $ H.div H.! HA.class_ "application" $ rendered
+  withMaster "/public/js/index.bundle.js" $ H.div H.! HA.class_ "application" $ rendered
 
 
 loginPage :: H.Html -> H.Html
 loginPage rendered =
-  withMaster "/public/js/login.js" $ H.div H.! HA.class_ "application" $ rendered
+  withMaster "/public/js/login.bundle.js" $ H.div H.! HA.class_ "application" $ rendered
 
 
 renderHtml :: H.Html -> T.Text
