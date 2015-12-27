@@ -21,8 +21,5 @@
     "purescript-cookies": "~0.1.5",
     "purescript-argonaut-codecs": "~0.5.0",
     "purescript-exceptions": "~0.3.3"
-  },
-  "resolutions": {
-    "purescript-affjax": "~0.10.0"
   }
 }

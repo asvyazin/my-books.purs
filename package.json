@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "purescript experiment",
   "scripts": {
-    "pulp": "pulp",
+    "webpack": "webpack",
     "bower": "bower"
   },
   "keywords": [
@@ -18,12 +18,9 @@
     "babel-core": "^6.2.1",
     "babel-preset-es2015": "^6.1.18",
     "bower": "^1.6.5",
-    "gulp-purescript": "^0.7.0",
-    "pulp": "^4.4.1",
-    "webpack-stream": "^2.1.1"
-  },
-  "dependencies": {
-    "jquery.cookie": "^1.4.1"
+    "bower-webpack-plugin": "^0.1.9",
+    "purs-loader": "^0.4.0",
+    "webpack": "^1.12.9"
   },
   "babel": {
     "presets": [
