@@ -19,6 +19,7 @@ import DOM.HTML
 import DOM.HTML.Types
 import DOM.HTML.Window
 import DOM.Node.ParentNode
+import qualified Libs.PouchDB as DB
 import Network.HTTP.Affjax
 import Prelude
 import qualified React as R
@@ -28,8 +29,9 @@ import Web.Cookies
 import Entries.Index.Class
 
 
-main :: Eff (cookie :: COOKIE, ajax :: AJAX, dom :: DOM, err :: EXCEPTION) Unit
+main :: Eff (cookie :: COOKIE, ajax :: AJAX, dom :: DOM, err :: EXCEPTION, pouchdb :: DB.POUCHDB) Unit
 main = launchAff $ do
+  db <- liftEff $ DB.newPouchDB "MyBooks.purs"
   onedriveToken <- liftEff $ getCookie "onedriveToken"
   user <- case onedriveToken of
     Nothing ->
@@ -80,8 +82,7 @@ instance decodeJsonUserInfo :: DecodeJson UserInfo where
         _name <- o .? "name"
         _firstName <- o .? "first_name"
         _lastName <- o .? "last_name"
-        return $
-          UserInfo
+        return $ UserInfo
           { id : _id
           , name : _name
           , firstName : _firstName

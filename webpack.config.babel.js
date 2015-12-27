@@ -30,6 +30,10 @@ module.exports = {
 	loaders: [{
 	    test: /\.purs$/,
 	    loader: 'purs-loader?output=' + output + '&' + srcs.concat(ffis).join('&')
+	}, {
+	    test: /\.js$/,
+	    exclude: /(node_modules|bower_components)/,
+	    loader: 'babel' // 'babel-loader' is also a legal name to reference
 	}]
     },
     resolve: {
