@@ -1,6 +1,7 @@
 module Entries.Index where
 
 
+import Control.Bind
 import Control.Monad.Aff
 import Control.Monad.Eff
 import Control.Monad.Eff.Class
@@ -27,23 +28,27 @@ import Web.Cookies
 
 
 import Entries.Index.Class
+import Common.Settings
 
 
 main :: Eff (cookie :: COOKIE, ajax :: AJAX, dom :: DOM, err :: EXCEPTION, pouchdb :: DB.POUCHDB) Unit
 main = launchAff $ do
   db <- liftEff $ DB.newPouchDB "MyBooks.purs"
+  settings <- tryGetSettings db
   onedriveToken <- liftEff $ getCookie "onedriveToken"
-  user <- case onedriveToken of
-    Nothing ->
-      return Nothing
-    Just token -> do
-      result <- getUserInfo token
-      return $ case result of
-        Right (UserInfo userInfo) ->
-          Just $ userInfo.name
-        _ ->
-          Nothing
+  let getName (UserInfo userInfo) =
+        userInfo.name
+  let fromEither =
+        eitherToMaybe >=> (return <<< getName)
+  let maybeName =
+        getUserInfo >=> (return <<< fromEither)
+  user <- maybe (return Nothing) maybeName onedriveToken
   liftEff $ renderMain user
+    
+
+eitherToMaybe :: forall a b. Either a b -> Maybe b
+eitherToMaybe =
+  either (const Nothing) Just
 
 
 renderMain :: forall e. Maybe String -> Eff (dom :: DOM | e) Unit
@@ -53,7 +58,7 @@ renderMain user = do
   void $ R.render (R.createFactory (component user) {}) container
 
 
-data UserInfo =
+newtype UserInfo =
   UserInfo
   { id :: String
   , name :: String
