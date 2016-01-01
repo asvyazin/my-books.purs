@@ -8,7 +8,9 @@ import PouchDB from "pouchdb";
 
 
 function newPouchDB (name) {
-    return new PouchDB(name);
+    return function () {
+	return new PouchDB(name);
+    };
 }
 
 
@@ -18,13 +20,16 @@ function putFFI (db) {
 	    return function (doc) {
 		return function (errorCallback) {
 		    return function (successCallback) {
-			db.put(doc, docId, docRev, undefined, function (error, result) {
-			    if (error) {
-				errorCallback(error)();
-			    } else {
-				successCallback(result)();
-			    }
-			});
+			return function () {
+			    db.put(doc, docId, docRev, function (error, result) {
+				if (error) {
+				    errorCallback(error)();
+				} else {
+				    successCallback(result)();
+				}
+			    });
+			    return {};
+			};
 		    };
 		};
 	    };
@@ -37,13 +42,16 @@ function postFFI (db) {
     return function (doc) {
 	return function (errorCallback) {
 	    return function (successCallback) {
-		db.post(doc, undefined, function (error, result) {
-		    if (error) {
-			errorCallback(error)();
-		    } else {
-			successCallback(result)();
-		    }
-		});
+		return function () {
+		    db.post(doc, function (error, result) {
+			if (error) {
+			    errorCallback(error)();
+			} else {
+			    successCallback(result)();
+			}
+		    });
+		    return {};
+		};
 	    };
 	};
     };
@@ -54,13 +62,16 @@ function getFFI (db) {
     return function (docId) {
 	return function (errorCallback) {
 	    return function (successCallback) {
-		db.get(docId, undefined, function (error, result) {
-		    if (error) {
-			errorCallback(error)();
-		    } else {
-			successCallback(result)();
-		    }
-		});
+		return function () {
+		    db.get(docId, function (error, result) {
+			if (error) {
+			    errorCallback(error)();
+			} else {
+			    successCallback(result)();
+			}
+		    });
+		    return {};
+		};
 	    };
 	};
     };

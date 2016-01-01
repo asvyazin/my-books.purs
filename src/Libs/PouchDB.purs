@@ -66,29 +66,29 @@ instance putResponseIsForeign :: IsForeign PutResponseFFI where
       }
 
 
-foreign import putFFI :: forall a e. PouchDB -> String -> Maybe String -> a -> PouchDBCallbackFFI e Foreign
+foreign import putFFI :: forall e. PouchDB -> String -> Maybe String -> Foreign -> PouchDBCallbackFFI e Foreign
 
 
 put :: forall a e. PouchDB -> String -> Maybe String -> a -> PouchDBAff e PutResponse
 put db docId docRev doc = do
-  foreignResult <- makeAff $ putFFI db docId docRev doc
+  foreignResult <- makeAff $ putFFI db docId docRev $ toForeign doc
   (PutResponseFFI result) <- readForeignAff foreignResult
   return result
 
 
-foreign import postFFI :: forall a e. PouchDB -> a -> PouchDBCallbackFFI e Foreign
+foreign import postFFI :: forall e. PouchDB -> Foreign -> PouchDBCallbackFFI e Foreign
 
 
 post :: forall a e. PouchDB -> a -> PouchDBAff e PutResponse
 post db doc = do
-  foreignResult <- makeAff $ postFFI db doc
+  foreignResult <- makeAff $ postFFI db $ toForeign doc
   (PutResponseFFI result) <- readForeignAff foreignResult
   return result
 
 
-foreign import getFFI :: forall a e. PouchDB -> String -> PouchDBCallbackFFI e a
+foreign import getFFI :: forall e. PouchDB -> String -> PouchDBCallbackFFI e Foreign
 
 
-get :: forall a e. PouchDB -> String -> PouchDBAff e a
+get :: forall a e. (IsForeign a)  => PouchDB -> String -> PouchDBAff e a
 get db docId =
-  makeAff $ getFFI db docId
+  makeAff (getFFI db docId) >>= readForeignAff
