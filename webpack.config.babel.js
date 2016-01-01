@@ -15,12 +15,11 @@ var modulesDirectories = [
 ];
 
 module.exports = {
-    context: path.resolve(__dirname, 'src'),
     entry: {
-	index: 'Entries/Index.purs',
-	'index.server': 'Entries/Index/Server.purs',
-	login: 'Entries/Login.purs',
-	'login.server': 'Entries/Login/Server.purs'
+	index: './js/Index.js',
+	'index.server': './src/Entries/Index/Server.purs',
+	login: './js/Login.js',
+	'login.server': './src/Entries/Login/Server.purs'
     },
     output: {
 	path: path.resolve(__dirname, "public/js"),
@@ -33,7 +32,7 @@ module.exports = {
 	}, {
 	    test: /\.js$/,
 	    exclude: /(node_modules|bower_components)/,
-	    loader: 'babel' // 'babel-loader' is also a legal name to reference
+	    loader: 'babel'
 	}]
     },
     resolve: {
