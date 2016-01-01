@@ -92,3 +92,9 @@ foreign import getFFI :: forall e. PouchDB -> String -> PouchDBCallbackFFI e For
 get :: forall a e. (IsForeign a)  => PouchDB -> String -> PouchDBAff e a
 get db docId =
   makeAff (getFFI db docId) >>= readForeignAff
+
+
+tryGet :: forall a e. (IsForeign a) => PouchDB -> String -> PouchDBAff e (Maybe a)
+tryGet db docId = do
+  result <- attempt $ get db docId
+  return $ either (const Nothing) Just result
