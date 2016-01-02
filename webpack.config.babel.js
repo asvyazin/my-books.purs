@@ -7,8 +7,8 @@ var ffis = ['ffi[]=bower_components/purescript-*/src/**/*.js', 'ffi[]=src/**/*.j
 var output = 'output';
 
 var modulesDirectories = [
-    './output',
-    'node_modules'
+    'node_modules',
+    'bower_components'
 ];
 
 module.exports = {
