@@ -12,23 +12,25 @@ import Text.Blaze
 
 reactJsFiles :: [FilePath]
 reactJsFiles =
- [ "bower_components/react/react.min.js"
- , "bower_components/react/react-dom.min.js" ]
+ [ "node_modules/react/dist/react.min.js"
+ , "node_modules/react-dom/dist/react-dom.min.js" ]
 
 
 hsResult :: (MonadIO m) => CDukContext -> m Int -> m ()
 hsResult ctx func = do
   res <- func
-  when (res /= 0) $ do
-     err <- liftIO $ dukSafeToLString ctx (-1)
-     fail err
+  when (res /= 0) $ liftIO $ do
+       isError <- dukIsError ctx (-1)
+       when isError $ void $ dukGetPropString ctx (-1) "stack"
+       err <- dukSafeToLString ctx (-1)
+       fail err
 
 
 render :: (MonadIO m) => String -> [Value] -> m Markup
 render jsFilename args =
   liftIO $ do
     ctx <- dukCreateHeapDefault
-    forM_ reactJsFiles $ \jsFile -> hsResult ctx $ dukPEvalFile ctx jsFile
+    forM_ reactJsFiles $ \jsFile -> hsResult ctx $ dukPEvalFileNoResult ctx jsFile
     hsResult ctx $ dukPEvalFile ctx jsFilename
     jsResult <- callPurescriptFunc ctx "serverSideRender" args
     return $ preEscapedToMarkup jsResult

@@ -1,5 +1,3 @@
-var BowerWebpackPlugin = require('bower-webpack-plugin');
-
 var path = require('path');
 
 var srcs = ['src[]=bower_components/purescript-*/src/**/*.purs', 'src[]=src/**/*.purs'];
@@ -10,8 +8,7 @@ var output = 'output';
 
 var modulesDirectories = [
     './output',
-    'node_modules',
-    'bower_components/purescript-prelude/src'
+    'node_modules'
 ];
 
 module.exports = {
@@ -42,8 +39,5 @@ module.exports = {
     },
     resolveLoader: {
 	root: path.join(__dirname, 'node_modules')
-    },
-    plugins: [
-	new BowerWebpackPlugin()
-    ]
+    }
 };
