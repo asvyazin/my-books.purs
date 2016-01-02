@@ -13,7 +13,7 @@ import Text.Blaze
 reactJsFiles :: [FilePath]
 reactJsFiles =
  [ "node_modules/react/dist/react.min.js"
- , "node_modules/react-dom/dist/react-dom.min.js" ]
+ ]
 
 
 hsResult :: (MonadIO m) => CDukContext -> m Int -> m ()

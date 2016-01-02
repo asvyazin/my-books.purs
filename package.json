@@ -30,8 +30,7 @@
   },
   "dependencies": {
     "pouchdb": "^5.1.0",
-    "react": "^0.14.5",
-    "react-bootstrap": "^0.28.1",
-    "react-dom": "^0.14.5"
+    "react": "~0.13.3",
+    "react-bootstrap": "~0.26.0"
   }
 }

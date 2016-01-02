@@ -1,3 +1,7 @@
+# *WARNING* For now it only works on Unix:
+1. purs-loader generates incorrect require path on Windows (ex. "..\\..\\" instead of "..\\\\..\\\\")
+1. modules "react" and "React" conflict with each other
+
 # To run
 
 1. `$ git submodule update --init --recursive`
