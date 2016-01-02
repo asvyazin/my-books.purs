@@ -7,6 +7,8 @@ import qualified React.DOM as R
 import qualified React.DOM.Props as RP
 import qualified Thermite as T
 
+import qualified Components.Wrappers.Button as Button
+
 
 type State =
   { directory :: Maybe String
@@ -20,8 +22,7 @@ render dispatch _ state _ =
   where
     renderChooseButton =
       renderMiddle
-      [ R.button
-        [ RP.className "btn btn-default btn-lg" ]
+      [ Button.button Button.defaultProps
         [ R.text "Choose books directory..." ]
       ]
 
