@@ -3,7 +3,6 @@ module Components.Header where
 import Data.Array
 import Data.Maybe
 import Prelude
-import qualified React as R
 import qualified React.DOM as R
 import qualified React.DOM.Props as RP
 import qualified Thermite as T
@@ -16,7 +15,7 @@ type Model =
   }
 
               
-render :: forall props. T.Render Model props (Array R.ReactElement)
+render :: forall props action. T.Render Model props action
 render dispatch _ state _ =
   [ R.nav
     [ RP.className "navbar navbar-default"
@@ -47,6 +46,6 @@ render dispatch _ state _ =
       R.div [ RP.className "alert alert-danger" ] [ R.text error ]
 
 
-spec :: forall eff props. T.Spec eff Model props (Array R.ReactElement)
+spec :: forall eff props action. T.Spec eff Model props action
 spec =
   T.simpleSpec T.defaultPerformAction render

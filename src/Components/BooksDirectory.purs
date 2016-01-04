@@ -2,34 +2,45 @@ module Components.BooksDirectory where
 
 
 import Data.Maybe
-import qualified React as R
+import Prelude
 import qualified React.DOM as R
 import qualified React.DOM.Props as RP
 import qualified Thermite as T
 
 import qualified Components.Wrappers.Button as Button
 import qualified Components.Wrappers.Glyphicon as Glyphicon
+import qualified Components.Wrappers.Modal as Modal
 
 
 type State =
   { directory :: Maybe String
+  , showModal :: Boolean
   }
 
 
-render :: forall props. T.Render State props (Array R.ReactElement)
+data Action
+  = HideModal
+  | ShowModal
+
+
+render :: forall props. T.Render State props Action
 render dispatch _ state _ =
   [ maybe renderChooseButton renderChoosedDirectory state.directory
+  , renderChooseModal state.showModal
   ]
   where
-    buttonProps =
-      Button.defaultProps { bsSize = Just Button.Large }
-    
     renderChooseButton =
-      renderMiddle
-      [ Button.button buttonProps
-        [ Glyphicon.glyphicon' "book"
-        , R.text "Choose books directory..." ]
-      ]
+      let
+        buttonProps =
+          { bsSize : "large"
+          , onClick : dispatch ShowModal
+          }
+      in 
+       renderMiddle
+       [ Button.button buttonProps
+         [ Glyphicon.glyphicon' "book"
+         , R.text "Choose books directory..." ]
+       ]
 
     renderChoosedDirectory dirName =
       renderMiddle
@@ -43,7 +54,17 @@ render dispatch _ state _ =
       [ RP.className "col-md-offset-5 col-md-2" ]
       elems
 
+    renderChooseModal show =
+      Modal.modal { show, onHide : dispatch HideModal } []
 
-spec :: forall eff props. T.Spec eff State props (Array R.ReactElement)
+
+performAction :: forall eff props. T.PerformAction eff State props Action
+performAction HideModal _ state update =
+  update $ state { showModal = false }
+performAction ShowModal _ state update =
+  update $ state { showModal = true }
+
+
+spec :: forall eff props. T.Spec eff State props Action
 spec =
-  T.simpleSpec T.defaultPerformAction render
+  T.simpleSpec performAction render
