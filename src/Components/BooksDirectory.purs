@@ -39,7 +39,8 @@ render dispatch _ state _ =
        renderMiddle
        [ Button.button buttonProps
          [ Glyphicon.glyphicon' "book"
-         , R.text " Choose books directory..." ]
+         , R.text " Choose books directory..."
+         ]
        ]
 
     renderChoosedDirectory dirName =
@@ -55,7 +56,21 @@ render dispatch _ state _ =
       elems
 
     renderChooseModal show =
-      Modal.modal { show, onHide : dispatch HideModal } []
+      Modal.modal
+      { show
+      , onHide: dispatch HideModal
+      }
+      [ Modal.header
+        { closeButton: true }
+        [ R.text "Choose directory" ]
+      , Modal.body {}
+        [ R.text "Here lies body..." ]
+      , Modal.footer {}
+        [ Button.button
+          { onClick: dispatch HideModal }
+          [ R.text "Close" ]
+        ]
+      ]
 
 
 performAction :: forall eff props. T.PerformAction eff State props Action
