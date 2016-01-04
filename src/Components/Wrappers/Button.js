@@ -5,7 +5,5 @@
 import { Button } from "react-bootstrap";
 
 
-let buttonFFI = Button;
+export const buttonFFI = Button;
 
-
-export { buttonFFI }

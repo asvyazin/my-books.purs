@@ -5,7 +5,5 @@
 import { Glyphicon } from "react-bootstrap";
 
 
-let glyphiconFFI = Glyphicon;
+export const glyphiconFFI = Glyphicon;
 
-
-export { glyphiconFFI }
