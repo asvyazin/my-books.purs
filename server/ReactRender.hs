@@ -32,14 +32,10 @@ render jsFilename args =
 
 callPurescriptFunc :: CDukContext -> String -> [Value] -> IO String
 callPurescriptFunc ctx funcName arguments = do
-  case arguments of
-    [] ->
-      guard =<< dukGetPropString ctx (-1) funcName -- [result]
-    _ -> do
-      void $ dukPushString ctx funcName -- [funcname]
-      mapM_ (pushValue ctx) arguments -- [funcname, arguments...]
-      let argsLen = length arguments
-      hsResult ctx $ dukPcallProp ctx (-2 - argsLen) argsLen -- [result]
+  guard =<< dukGetPropString ctx (-1) funcName
+  forM_ arguments $ \arg -> do
+    pushValue ctx arg
+    hsResult ctx $ dukPcall ctx 1
   result <- dukGetString ctx (-1)
   dukPop ctx
   return result
