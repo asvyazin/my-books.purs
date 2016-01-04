@@ -3,7 +3,8 @@ module Components.OneDriveFileTree where
 
 import Control.Monad
 import Control.Monad.Aff
-import Control.Monad.Eff.Exception
+import Control.Monad.Eff.Class
+import Data.Array
 import Data.Maybe
 import Prelude
 import qualified React as R
@@ -31,11 +32,13 @@ type State =
   , loaded :: Boolean
   , errorText :: Maybe String
   , children :: Array Props
+  , selected :: Boolean
   }
 
 
 data Action
   = ToggleCollapsed
+  | ToggleSelected
 
 
 defaultState :: State
@@ -44,12 +47,13 @@ defaultState =
   , loaded: false
   , errorText: Nothing
   , children: []
+  , selected: false
   }
 
 
 fileTree :: Props -> R.ReactElement
 fileTree props =
-  R.createElement reactClass props []  
+  R.createElement reactClass props []
   where
     reactClass =
       T.createClass spec defaultState
@@ -58,22 +62,23 @@ fileTree props =
       T.simpleSpec performAction render
 
     performAction ToggleCollapsed props state update =
-      if (not state.collapsed)
-      then
-        update $ state { collapsed = true }
-      else do
-        update $ state { collapsed = false }
-        when (not state.loaded) $
-          runAff onError onSuccess $ getChildrenByItemId props.onedriveToken props.itemId
+      launchAff performActionAff
       where
-        onSuccess childrenData = do
-          let
-            children =
-              map (\ (OneDriveItem d) -> { onedriveToken: props.onedriveToken, name: d.name, itemId: Just d.id, key: d.id }) childrenData
-          update $ state { collapsed = false, loaded = true, children = children }
+        performActionAff =
+          if (not state.collapsed)
+          then
+            liftEff $ update $ state { collapsed = true }
+          else do
+            liftEff $ update $ state { collapsed = false }
+            when (not state.loaded) $ do
+              childrenData <- getChildrenByItemId props.onedriveToken props.itemId
+              let
+                children =
+                  map (\ (OneDriveItem d) -> { onedriveToken: props.onedriveToken, name: d.name, itemId: Just d.id, key: d.id }) childrenData
+              liftEff $ update $ state { collapsed = false, loaded = true, children = children }
 
-        onError error =
-          throwException error
+    performAction ToggleSelected _ state update =
+      update $ state { selected = not state.selected }
 
     render :: T.Render State Props Action
     render dispatch props state _ =
@@ -94,13 +99,22 @@ fileTree props =
                   [ ajaxLoader ]
                 Just err ->
                   [ Alert.alert { bsStyle: "danger" } [ R.text err ] ]
+
+        selectedClass =
+          if state.selected
+          then (Just $ RP.className "bg-primary")
+          else Nothing
+
+        itemProps =
+          catMaybes [ Just $ RP.onClick $ const $ dispatch ToggleSelected, selectedClass ]
+
+        itemLabel =
+          R.span itemProps [ glyphicon, R.text $ " " ++ props.name ]
       in
        [ TreeView.treeview
          { collapsed: state.collapsed
-         , nodeLabel:
-           R.span
-           [ RP.onClick $ const $ dispatch ToggleCollapsed ]
-           [ glyphicon, R.text $ " " ++ props.name ]
+         , nodeLabel: itemLabel
+         , onClick: dispatch ToggleCollapsed
          }
          children
        ]
