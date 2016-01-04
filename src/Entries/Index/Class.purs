@@ -10,6 +10,11 @@ import qualified Components.Header as H
 import qualified Components.BooksDirectory as BD
 
 
+type Props =
+  { onedriveToken :: String
+  }
+
+
 type Model =
   { header :: H.Model
   , booksDirectory :: BD.State
@@ -51,11 +56,11 @@ initialState user =
   }
 
 
-spec :: forall eff props. T.Spec eff Model props Action
+spec :: forall eff. T.Spec eff Model Props Action
 spec =
   T.focusState header H.spec <> T.focus booksDirectory booksDirectoryAction BD.spec
 
 
-component :: forall props. Maybe String -> R.ReactClass props
+component :: Maybe String -> R.ReactClass Props
 component user =
   T.createClass spec $ initialState user

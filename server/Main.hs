@@ -81,7 +81,7 @@ main = runSpock 8000 $ spockT id $ do
     case onedriveTokenCookie of
       Just token -> do
         meUser <- C.withManager $ me token
-        rendered <- render "public/js/index.server.bundle.js" [toJSON $ meUser ^. name]
+        rendered <- render "public/js/index.server.bundle.js" [toJSON $ meUser ^. name, toJSON token]
         html $ renderHtml $ indexPage rendered
       _ ->
         redirect "/login"

@@ -7,9 +7,15 @@ import qualified React.DOM as R
 import qualified React.DOM.Props as RP
 import qualified Thermite as T
 
+import qualified Components.OneDriveFileTree as FileTree
 import qualified Components.Wrappers.Button as Button
 import qualified Components.Wrappers.Glyphicon as Glyphicon
 import qualified Components.Wrappers.Modal as Modal
+
+
+type Props =
+  { onedriveToken :: String
+  }
 
 
 type State =
@@ -23,8 +29,8 @@ data Action
   | ShowModal
 
 
-render :: forall props. T.Render State props Action
-render dispatch _ state _ =
+render :: T.Render State Props Action
+render dispatch props state _ =
   [ maybe renderChooseButton renderChoosedDirectory state.directory
   , renderChooseModal state.showModal
   ]
@@ -64,7 +70,13 @@ render dispatch _ state _ =
         { closeButton: true }
         [ R.text "Choose directory" ]
       , Modal.body {}
-        [ R.text "Here lies body..." ]
+        [ FileTree.fileTree
+          { name: "root"
+          , onedriveToken: props.onedriveToken
+          , itemId: Nothing
+          , key: "root"
+          }
+        ]
       , Modal.footer {}
         [ Button.button
           { onClick: dispatch HideModal }
@@ -73,13 +85,13 @@ render dispatch _ state _ =
       ]
 
 
-performAction :: forall eff props. T.PerformAction eff State props Action
+performAction :: forall eff. T.PerformAction eff State Props Action
 performAction HideModal _ state update =
   update $ state { showModal = false }
 performAction ShowModal _ state update =
   update $ state { showModal = true }
 
 
-spec :: forall eff props. T.Spec eff State props Action
+spec :: forall eff. T.Spec eff State Props Action
 spec =
   T.simpleSpec performAction render
