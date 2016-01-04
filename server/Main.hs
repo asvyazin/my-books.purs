@@ -37,6 +37,7 @@ withMaster mainScript childrenMarkup = H.docTypeHtml $ do
     H.meta H.! HA.charset "UTF-8"
     H.title "My Books"
     H.link H.! HA.rel "stylesheet" H.! HA.type_ "text/css" H.! HA.href "/bower_components/bootstrap/dist/css/bootstrap.min.css"
+    H.link H.! HA.rel "stylesheet" H.! HA.type_ "text/css" H.! HA.href "/node_modules/react-treeview/react-treeview.css"
   H.body $ do
     ie10comment $ H.p H.! HA.class_ "browserupgrade" $ do
       H.text "You are using an "
@@ -45,8 +46,6 @@ withMaster mainScript childrenMarkup = H.docTypeHtml $ do
       H.a H.! HA.href "http://browserhappy.com/" $ "upgrade your browser"
       H.text " to improve your experience."
     childrenMarkup
-    H.script H.! HA.src "/bower_components/react/react.min.js" $ ""
-    H.script H.! HA.src "/bower_components/react/react-dom.min.js" $ ""
     H.script H.! HA.src (H.toValue mainScript) $ ""
 
 
