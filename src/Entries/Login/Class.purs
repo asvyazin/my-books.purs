@@ -12,6 +12,8 @@ import qualified React.DOM.Props as RP
 import qualified Thermite as T
 
 import qualified Components.Header as H
+import qualified Components.Wrappers.Button as Button
+import qualified Components.Wrappers.Glyphicon as Glyphicon
 
 
 type Model =
@@ -25,13 +27,11 @@ render :: forall props. T.Render Model props (Array R.ReactElement)
 render dispatch _ state _ =
   [ R.div
     [ RP.className "col-md-offset-5 col-md-2" ]
-    [ R.a
-      [ RP.className "btn btn-default btn-lg"
-      , RP.href loginUrl
-      ]
-      [ R.span
-        [ RP.className "glyphicon glyphicon-cloud" ]
-        [ ]
+    [ Button.button
+      { bsSize: "large"
+      , href: loginUrl
+      }
+      [ Glyphicon.glyphicon' "cloud"
       , R.text " Go to OneDrive"
       ]
     ]

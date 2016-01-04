@@ -39,7 +39,7 @@ render dispatch _ state _ =
        renderMiddle
        [ Button.button buttonProps
          [ Glyphicon.glyphicon' "book"
-         , R.text "Choose books directory..." ]
+         , R.text " Choose books directory..." ]
        ]
 
     renderChoosedDirectory dirName =
