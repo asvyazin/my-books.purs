@@ -23,7 +23,8 @@ hsResult ctx func = do
 render :: (MonadIO m) => String -> [Value] -> m Markup
 render jsFilename args =
   liftIO $ do
-    ctx <- dukCreateHeapDefault 
+    ctx <- dukCreateHeapDefault
+    hsResult ctx $ dukPEvalFileNoResult ctx "js/duktape-console-shim.js"
     hsResult ctx $ dukPEvalFile ctx jsFilename
     jsResult <- callPurescriptFunc ctx "serverSideRender" args
     return $ preEscapedToMarkup jsResult
