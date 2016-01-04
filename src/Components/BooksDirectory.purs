@@ -8,6 +8,7 @@ import qualified React.DOM.Props as RP
 import qualified Thermite as T
 
 import qualified Components.Wrappers.Button as Button
+import qualified Components.Wrappers.Glyphicon as Glyphicon
 
 
 type State =
@@ -20,10 +21,14 @@ render dispatch _ state _ =
   [ maybe renderChooseButton renderChoosedDirectory state.directory
   ]
   where
+    buttonProps =
+      Button.defaultProps { bsSize = Just Button.Large }
+    
     renderChooseButton =
       renderMiddle
-      [ Button.button Button.defaultProps
-        [ R.text "Choose books directory..." ]
+      [ Button.button buttonProps
+        [ Glyphicon.glyphicon' "book"
+        , R.text "Choose books directory..." ]
       ]
 
     renderChoosedDirectory dirName =

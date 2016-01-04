@@ -10,12 +10,6 @@ import Scripting.Duktape.Raw
 import Text.Blaze
 
 
-reactJsFiles :: [FilePath]
-reactJsFiles =
- [ "node_modules/react/dist/react.min.js"
- ]
-
-
 hsResult :: (MonadIO m) => CDukContext -> m Int -> m ()
 hsResult ctx func = do
   res <- func
@@ -29,8 +23,7 @@ hsResult ctx func = do
 render :: (MonadIO m) => String -> [Value] -> m Markup
 render jsFilename args =
   liftIO $ do
-    ctx <- dukCreateHeapDefault
-    forM_ reactJsFiles $ \jsFile -> hsResult ctx $ dukPEvalFileNoResult ctx jsFile
+    ctx <- dukCreateHeapDefault 
     hsResult ctx $ dukPEvalFile ctx jsFilename
     jsResult <- callPurescriptFunc ctx "serverSideRender" args
     return $ preEscapedToMarkup jsResult
@@ -45,7 +38,7 @@ callPurescriptFunc ctx funcName arguments = do
       void $ dukPushString ctx funcName -- [funcname]
       mapM_ (pushValue ctx) arguments -- [funcname, arguments...]
       let argsLen = length arguments
-      dukCallProp ctx (-2 - argsLen) argsLen -- [result]
+      hsResult ctx $ dukPcallProp ctx (-2 - argsLen) argsLen -- [result]
   result <- dukGetString ctx (-1)
   dukPop ctx
   return result
