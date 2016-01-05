@@ -16,7 +16,7 @@
   "repository": "https://github.com/asvyazin/my-books.purs",
   "devDependencies": {
     "babel-core": "^6.2.1",
-    "babel-loader": "^6.2.0",
+    "babel-loader": "^6.2.1",
     "babel-preset-es2015": "^6.1.18",
     "bower": "^1.6.5",
     "bower-webpack-plugin": "^0.1.9",
