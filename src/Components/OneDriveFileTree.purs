@@ -4,7 +4,6 @@ module Components.OneDriveFileTree where
 import Control.Monad
 import Control.Monad.Aff
 import Control.Monad.Eff.Class
-import Data.Array
 import Data.Maybe
 import Prelude
 import qualified React as R
@@ -24,6 +23,7 @@ type Props =
   , onedriveToken :: String
   , itemId :: Maybe String
   , key :: String
+  , onSelect :: Maybe String -> T.EventHandler
   }
 
 
@@ -32,13 +32,12 @@ type State =
   , loaded :: Boolean
   , errorText :: Maybe String
   , children :: Array Props
-  , selected :: Boolean
   }
 
 
 data Action
   = ToggleCollapsed
-  | ToggleSelected
+  | SelectDirectory
 
 
 defaultState :: State
@@ -47,7 +46,6 @@ defaultState =
   , loaded: false
   , errorText: Nothing
   , children: []
-  , selected: false
   }
 
 
@@ -74,11 +72,20 @@ fileTree props =
               childrenData <- getChildrenByItemId props.onedriveToken props.itemId
               let
                 children =
-                  map (\ (OneDriveItem d) -> { onedriveToken: props.onedriveToken, name: d.name, itemId: Just d.id, key: d.id }) childrenData
+                  map childrenProps childrenData
               liftEff $ update $ state { collapsed = false, loaded = true, children = children }
 
-    performAction ToggleSelected _ state update =
-      update $ state { selected = not state.selected }
+        childrenProps :: OneDriveItem -> Props
+        childrenProps (OneDriveItem item) =
+          { onedriveToken: props.onedriveToken
+          , name: item.name
+          , itemId: Just item.id
+          , key: item.id
+          , onSelect: props.onSelect
+          }
+
+    performAction SelectDirectory props state update =
+      props.onSelect props.itemId
 
     render :: T.Render State Props Action
     render dispatch props state _ =
@@ -100,13 +107,8 @@ fileTree props =
                 Just err ->
                   [ Alert.alert { bsStyle: "danger" } [ R.text err ] ]
 
-        selectedClass =
-          if state.selected
-          then (Just $ RP.className "bg-primary")
-          else Nothing
-
         itemProps =
-          catMaybes [ Just $ RP.onClick $ const $ dispatch ToggleSelected, selectedClass ]
+          [ RP.onClick $ const $ dispatch SelectDirectory ]
 
         itemLabel =
           R.span itemProps [ glyphicon, R.text $ " " ++ props.name ]

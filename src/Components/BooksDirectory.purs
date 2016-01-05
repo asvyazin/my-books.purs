@@ -27,6 +27,7 @@ type State =
 data Action
   = HideModal
   | ShowModal
+  | DirectorySelected (Maybe String)
 
 
 render :: T.Render State Props Action
@@ -44,8 +45,11 @@ render dispatch props state _ =
       in 
        renderMiddle
        [ Button.button buttonProps
-         [ Glyphicon.glyphicon' "book"
-         , R.text " Choose books directory..."
+         [ R.div
+           [ RP.className "col-md-2" ]
+           [ Glyphicon.glyphicon' "book"
+           , R.text " Choose books directory..."
+           ]
          ]
        ]
 
@@ -54,11 +58,16 @@ render dispatch props state _ =
       [ R.span
         [ RP.className "default" ]
         [ R.text dirName ]
+      , Button.button
+        { onClick: dispatch ShowModal
+        , bsStyle: "link"
+        }
+        [ R.text "Choose another" ]
       ]
 
     renderMiddle elems =
       R.div
-      [ RP.className "col-md-offset-5 col-md-2" ]
+      [ RP.className "col-md-offset-5" ]
       elems
 
     renderChooseModal show =
@@ -75,6 +84,7 @@ render dispatch props state _ =
           , onedriveToken: props.onedriveToken
           , itemId: Nothing
           , key: "root"
+          , onSelect: dispatch <<< DirectorySelected
           }
         ]
       , Modal.footer {}
@@ -90,6 +100,8 @@ performAction HideModal _ state update =
   update $ state { showModal = false }
 performAction ShowModal _ state update =
   update $ state { showModal = true }
+performAction (DirectorySelected itemId) _ state update =
+  update $ state { showModal = false, directory = itemId }
 
 
 spec :: forall eff. T.Spec eff State Props Action
