@@ -1,7 +1,9 @@
 module Entries.Index.Class where
 
+import Control.Monad.Eff.Exception
 import Data.Lens
 import Data.Maybe
+import Network.HTTP.Affjax
 import Prelude
 import qualified React as R
 import qualified Thermite as T
@@ -56,7 +58,7 @@ initialState user =
   }
 
 
-spec :: forall eff. T.Spec eff Model Props Action
+spec :: forall eff. T.Spec (ajax :: AJAX, err :: EXCEPTION | eff) Model Props Action
 spec =
   T.focusState header H.spec <> T.focus booksDirectory booksDirectoryAction BD.spec
 

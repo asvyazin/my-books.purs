@@ -1,12 +1,17 @@
 module Components.BooksDirectory where
 
 
+import Control.Monad.Aff
+import Control.Monad.Eff.Exception
 import Data.Maybe
+import Data.String
+import Network.HTTP.Affjax
 import Prelude
 import qualified React.DOM as R
 import qualified React.DOM.Props as RP
 import qualified Thermite as T
 
+import Common.OneDriveApi
 import qualified Components.OneDriveFileTree as FileTree
 import qualified Components.Wrappers.Button as Button
 import qualified Components.Wrappers.Glyphicon as Glyphicon
@@ -19,8 +24,14 @@ type Props =
 
 
 type State =
-  { directory :: Maybe String
+  { directory :: Maybe DirectoryInfo
   , showModal :: Boolean
+  }
+
+
+type DirectoryInfo =
+  { itemId :: Maybe String
+  , path :: String
   }
 
 
@@ -53,11 +64,11 @@ render dispatch props state _ =
          ]
        ]
 
-    renderChoosedDirectory dirName =
+    renderChoosedDirectory directory =
       renderMiddle
       [ R.span
         [ RP.className "default" ]
-        [ R.text dirName ]
+        [ R.text directory.path ]
       , Button.button
         { onClick: dispatch ShowModal
         , bsStyle: "link"
@@ -95,15 +106,31 @@ render dispatch props state _ =
       ]
 
 
-performAction :: forall eff. T.PerformAction eff State Props Action
+performAction :: forall eff. T.PerformAction (ajax :: AJAX, err :: EXCEPTION | eff) State Props Action
 performAction HideModal _ state update =
   update $ state { showModal = false }
 performAction ShowModal _ state update =
   update $ state { showModal = true }
-performAction (DirectorySelected itemId) _ state update =
-  update $ state { showModal = false, directory = itemId }
+performAction (DirectorySelected itemId) props state update =
+  launchAff $ do
+    directory <- getDirectoryInfo props.onedriveToken itemId
+    liftEff' $ update $ state { showModal = false, directory = Just directory }
 
 
-spec :: forall eff. T.Spec eff State Props Action
+getDirectoryInfo :: forall e. String -> Maybe String -> Aff (ajax :: AJAX | e) DirectoryInfo
+getDirectoryInfo token itemId = do
+  item <- getItem <$> getOneDriveItem token itemId
+  let parentPath = fromMaybe "" (getPath <$> item.parentReference)
+  return { itemId, path: parentPath ++ "/" ++ item.name }
+  where
+    getItem (OneDriveItem item) = item
+    getPath (ItemReference reference) =
+      let
+        idx = indexOf ":" reference.path
+      in
+       maybe reference.path (\i -> drop (i + 1) reference.path) idx
+
+
+spec :: forall eff. T.Spec (ajax :: AJAX, err :: EXCEPTION | eff) State Props Action
 spec =
   T.simpleSpec performAction render

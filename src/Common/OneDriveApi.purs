@@ -57,12 +57,11 @@ instance decodeJsonUserInfo :: DecodeJson UserInfo where
     return $ UserInfo { id, name, firstName, lastName }
 
 
-getUserInfo :: forall e. String -> Aff (ajax :: AJAX | e) (Either String UserInfo)
+getUserInfo :: forall e. String -> Aff (ajax :: AJAX | e) UserInfo
 getUserInfo token = do
   let url = "https://apis.live.net/v5.0/me?access_token=" ++ token
   resp <- get url
-  let result = jsonParser resp.response >>= decodeJson
-  return result
+  getJson resp
 
 
 newtype OneDriveFolderFacet =
@@ -73,12 +72,21 @@ newtype OneDriveFileFacet =
   OneDriveFileFacet { mimeType :: String }
 
 
+newtype ItemReference =
+  ItemReference
+  { driveId :: String
+  , id :: String
+  , path :: String
+  }
+
+
 newtype OneDriveItem =
   OneDriveItem
   { id :: String
   , name :: String
   , folder :: Maybe OneDriveFolderFacet
   , file :: Maybe OneDriveFileFacet
+  , parentReference :: Maybe ItemReference
   }
 
 
@@ -92,6 +100,9 @@ derive instance genericOneDriveFolderFacet :: Generic OneDriveFolderFacet
 
 
 derive instance genericOneDriveFileFacet :: Generic OneDriveFileFacet
+
+
+derive instance genericItemReference :: Generic ItemReference
 
 
 derive instance genericOneDriveItem :: Generic OneDriveItem
@@ -114,6 +125,15 @@ instance decodeJsonOneDriveFileFacet :: DecodeJson OneDriveFileFacet where
     return $ OneDriveFileFacet { mimeType }
 
 
+instance decodeJsonOneDriveItemReference :: DecodeJson ItemReference where
+  decodeJson json = do
+    o <- mFail "Expected object" $ toObject json
+    driveId <- o .? "driveId"
+    id <- o .? "id"
+    path <- o .? "path"
+    return $ ItemReference { driveId, id, path }
+
+
 instance decodeJsonOneDriveItem :: DecodeJson OneDriveItem where
   decodeJson json = do
     o <- mFail "Expected object" $ toObject json
@@ -121,7 +141,8 @@ instance decodeJsonOneDriveItem :: DecodeJson OneDriveItem where
     name <- o .? "name"
     folder <- o .?? "folder"
     file <- o .?? "file"
-    return $ OneDriveItem { id, name, folder, file }
+    parentReference <- o .?? "parentReference"
+    return $ OneDriveItem { id, name, folder, file, parentReference }
 
 
 instance decodeJsonOneDriveItems :: DecodeJson OneDriveItems where
@@ -153,16 +174,42 @@ getChildrenByItemPath token itemPath =
 
 getOneDriveItems :: forall e. String -> String -> Aff (ajax :: AJAX | e) (Array OneDriveItem)
 getOneDriveItems token url = do
+  let req = onedriveGetRequest token url
+  getItems <$> doJsonRequest req
+  where
+    getItems (OneDriveItems items) =
+      items.value
+
+
+getOneDriveItem :: forall e. String -> Maybe String -> Aff (ajax :: AJAX | e) OneDriveItem
+getOneDriveItem token itemId = do
   let
+    url =
+      maybe "/drive/root" ("/drive/items/" ++) itemId
     req =
-      defaultRequest
-      { method = GET
-      , url = "https://api.onedrive.com/v1.0" ++ url
-      , headers = [ RequestHeader "Authorization" ("bearer " ++ token) ]
-      }
-  resp <- affjax req
+      onedriveGetRequest token url
+  doJsonRequest req
+
+
+onedriveGetRequest :: String -> String -> AffjaxRequest Unit
+onedriveGetRequest token url =
+  defaultRequest
+  { method = GET
+  , url = onedriveApiBaseUrl ++ url
+  , headers = [ RequestHeader "Authorization" ("bearer " ++ token) ]
+  }
+
+
+onedriveApiBaseUrl :: String
+onedriveApiBaseUrl = "https://api.onedrive.com/v1.0"
+
+
+doJsonRequest :: forall e a. (DecodeJson a) => AffjaxRequest Unit -> Aff (ajax :: AJAX | e) a
+doJsonRequest req =
+  affjax req >>= getJson
+
+
+getJson :: forall m a. (DecodeJson a, MonadError Error m) => AffjaxResponse String -> m a
+getJson resp = do
   let result = jsonParser resp.response >>= decodeJson
-  either (throwError <<< error) getItems result
-    where
-      getItems (OneDriveItems items) =
-        return items.value
+  either (throwError <<< error) return result
