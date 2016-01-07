@@ -18,6 +18,8 @@ import Network.HTTP.Method
 import Network.HTTP.RequestHeader
 import Prelude
 
+import Common.Json
+
 
 newtype UserInfo =
   UserInfo
@@ -34,18 +36,6 @@ derive instance genericUserInfo :: Generic UserInfo
 instance showUserInfo :: Show UserInfo where
   show = gShow
   
-
-mFail :: forall a b. a -> Maybe b -> Either a b
-mFail err =
-  maybe (Left err) Right
-
-
-(.??) :: forall a. (DecodeJson a) => JObject -> String -> Either String (Maybe a)
-(.??) jObj field =
-  maybe (pure Nothing) decode $ M.lookup field jObj
-  where
-    decode json = Just <$> decodeJson json
-
 
 instance decodeJsonUserInfo :: DecodeJson UserInfo where
   decodeJson json = do

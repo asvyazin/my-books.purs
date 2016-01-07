@@ -32,7 +32,7 @@ render dispatch _ state _ =
       , href: loginUrl
       }
       [ Glyphicon.glyphicon' "cloud"
-      , R.text " Go to OneDrive"
+      , R.text " Login to OneDrive"
       ]
     ]
   ]
