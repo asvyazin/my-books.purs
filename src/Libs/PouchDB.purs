@@ -4,23 +4,9 @@ module Libs.PouchDB where
 import Control.Monad.Aff
 import Control.Monad.Eff
 import Control.Monad.Eff.Exception
-import Control.Monad.Error.Class
-import Data.Either
 import Data.Foreign
-import Data.Foreign.Class
 import Data.Maybe
 import Prelude
-
-
-readForeignAff :: forall e a. (IsForeign a) => Foreign -> Aff e a
-readForeignAff fr =
-  case read fr of
-    Left (JSONError msg) ->
-      throwError $ error msg
-    Left _ ->
-      throwError $ error "Unknown error"
-    Right result ->
-      return result
 
 
 foreign import data POUCHDB :: !
@@ -51,50 +37,36 @@ type PutResponse =
   }
 
 
-data PutResponseFFI = PutResponseFFI PutResponse
+foreign import putFFI :: forall e a. PouchDB -> a -> PouchDBCallbackFFI e PutResponse
 
 
-instance putResponseIsForeign :: IsForeign PutResponseFFI where
-  read o = do
-    okVal <- readProp "ok" o
-    idVal <- readProp "id" o
-    revVal <- readProp "rev" o
-    return $ PutResponseFFI
-      { ok: okVal
-      , id: idVal
-      , rev: revVal
-      }
+put :: forall e a. PouchDB -> a -> PouchDBAff e PutResponse
+put db doc =
+  makeAff $ putFFI db doc
 
 
-foreign import putFFI :: forall e. PouchDB -> String -> Maybe String -> Foreign -> PouchDBCallbackFFI e Foreign
+foreign import postFFI :: forall e a. PouchDB -> a -> PouchDBCallbackFFI e PutResponse
 
 
-put :: forall a e. PouchDB -> String -> Maybe String -> a -> PouchDBAff e PutResponse
-put db docId docRev doc = do
-  foreignResult <- makeAff $ putFFI db docId docRev $ toForeign doc
-  (PutResponseFFI result) <- readForeignAff foreignResult
-  return result
+post :: forall e a. PouchDB -> a -> PouchDBAff e PutResponse
+post db doc =
+  makeAff $ postFFI db doc
 
 
-foreign import postFFI :: forall e. PouchDB -> Foreign -> PouchDBCallbackFFI e Foreign
+foreign import getFFI :: forall e a. PouchDB -> String -> PouchDBCallbackFFI e a
 
 
-post :: forall a e. PouchDB -> a -> PouchDBAff e PutResponse
-post db doc = do
-  foreignResult <- makeAff $ postFFI db $ toForeign doc
-  (PutResponseFFI result) <- readForeignAff foreignResult
-  return result
-
-
-foreign import getFFI :: forall e. PouchDB -> String -> PouchDBCallbackFFI e Foreign
-
-
-get :: forall a e. (IsForeign a)  => PouchDB -> String -> PouchDBAff e a
+get :: forall e a. PouchDB -> String -> PouchDBAff e a
 get db docId =
-  makeAff (getFFI db docId) >>= readForeignAff
+  makeAff $ getFFI db docId
 
 
-tryGet :: forall a e. (IsForeign a) => PouchDB -> String -> PouchDBAff e (Maybe a)
+foreign import tryGetFFI :: forall e. PouchDB -> String -> PouchDBCallbackFFI e Foreign
+
+
+tryGet :: forall e a. PouchDB -> String -> PouchDBAff e (Maybe a)
 tryGet db docId = do
-  result <- attempt $ get db docId
-  return $ either (const Nothing) Just result
+  foreignResult <- makeAff $ tryGetFFI db docId
+  return $ if isNull foreignResult
+           then Nothing
+           else Just $ unsafeFromForeign foreignResult

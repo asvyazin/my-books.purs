@@ -1,12 +1,10 @@
 module Entries.Index where
 
 
-import Control.Bind
 import Control.Monad.Aff
 import Control.Monad.Eff
 import Control.Monad.Eff.Class
 import Control.Monad.Eff.Exception
-import Control.Monad.Error.Class
 import Data.Maybe
 import Data.Maybe.Unsafe
 import Data.Nullable
@@ -22,29 +20,30 @@ import qualified React as R
 import Web.Cookies
 
 
-import Entries.Index.Class
+import Common.Monad
 import Common.OneDriveApi
 import Common.Settings
-
-
-mFail2 :: forall m a. (MonadError Error m) => String -> Maybe a -> m a
-mFail2 err =
-  maybe (throwError $ error err) return
+import qualified Components.BooksDirectory as BD
+import Entries.Index.Class
 
 
 main :: Eff (cookie :: COOKIE, ajax :: AJAX, dom :: DOM, err :: EXCEPTION, pouchdb :: DB.POUCHDB) Unit
 main = launchAff $ do
-  db <- liftEff $ DB.newPouchDB "MyBooks.purs"
-  settings <- tryGetSettings db
-  onedriveToken <- mFail2 "OneDrive token expected" =<< liftEff (getCookie "onedriveToken")
+  onedriveToken <-
+    liftEff (getCookie "onedriveToken") >>= guardMaybe (error "OneDrive token expected")
   let getName (UserInfo userInfo) =
         userInfo.name
   user <- getName <$> getUserInfo onedriveToken
-  liftEff $ renderMain user onedriveToken
+  liftEff' (renderMain user onedriveToken) >>= guardEither
     
 
-renderMain :: forall e. String -> String -> Eff (dom :: DOM | e) Unit
-renderMain user onedriveToken = do
-  node <- htmlDocumentToParentNode <$> (window >>= document)
-  container <- (fromJust <<< toMaybe) <$> querySelector ".application" node
-  void $ R.render (R.createFactory (component $ Just user) { onedriveToken }) container
+renderMain :: forall e. String -> String -> Eff (dom :: DOM, pouchdb :: DB.POUCHDB, err :: EXCEPTION, ajax :: AJAX | e) Unit
+renderMain user onedriveToken = launchAff $ do
+  db <- liftEff $ DB.newPouchDB "MyBooks.purs"
+  settings <- tryGetSettings db
+  directory <- maybe (return Nothing) (\ (Settings s) -> Just <$> BD.getDirectoryInfo onedriveToken s.booksDirectory) settings
+  liftEff $ do
+    node <- htmlDocumentToParentNode <$> (window >>= document)
+    container <- (fromJust <<< toMaybe) <$> querySelector ".application" node
+    let props = { onedriveToken, db: Just db }
+    void $ R.render (R.createFactory (component (Just user) directory) props) container

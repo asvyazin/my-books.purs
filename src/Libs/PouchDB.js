@@ -15,22 +15,19 @@ function newPouchDB (name) {
 
 
 function putFFI (db) {
-    return function (docId) {
-	return function (docRev) {
-	    return function (doc) {
-		return function (errorCallback) {
-		    return function (successCallback) {
-			return function () {
-			    db.put(doc, docId, docRev, function (error, result) {
-				if (error) {
-				    errorCallback(error)();
-				} else {
-				    successCallback(result)();
-				}
-			    });
-			    return {};
-			};
-		    };
+    return function (doc) {
+	return function (errorCallback) {
+	    return function (successCallback) {
+		return function () {
+		    console.log('put', doc);
+		    db.put(doc, function (error, result) {
+			if (error) {
+			    errorCallback(error)();
+			} else {
+			    successCallback(result)();
+			}
+		    });
+		    return {};
 		};
 	    };
 	};
@@ -78,4 +75,24 @@ function getFFI (db) {
 }
 
 
-export { newPouchDB, putFFI, postFFI, getFFI };
+function tryGetFFI (db) {
+    return function (docId) {
+	return function (errorCallback) {
+	    return function (successCallback) {
+		return function () {
+		    db.get(docId, function (error, result) {
+			if (error) {
+			    successCallback(null)();
+			} else {
+			    successCallback(result)();
+			}
+		    });
+		    return {};
+		};
+	    };
+	};
+    };
+}
+
+
+export { newPouchDB, putFFI, postFFI, getFFI, tryGetFFI };

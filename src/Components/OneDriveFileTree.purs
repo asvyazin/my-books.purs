@@ -4,6 +4,7 @@ module Components.OneDriveFileTree where
 import Control.Monad
 import Control.Monad.Aff
 import Control.Monad.Eff.Class
+import Data.Array
 import Data.Maybe
 import Prelude
 import qualified React as R
@@ -72,8 +73,11 @@ fileTree props =
               childrenData <- getChildrenByItemId props.onedriveToken props.itemId
               let
                 children =
-                  map childrenProps childrenData
+                  map childrenProps $ filter isDirectory childrenData
               liftEff $ update $ state { collapsed = false, loaded = true, children = children }
+
+        isDirectory (OneDriveItem item) =
+          isJust item.folder
 
         childrenProps :: OneDriveItem -> Props
         childrenProps (OneDriveItem item) =

@@ -9,4 +9,10 @@ import Entries.Index.Class
 
 serverSideRender :: String -> String -> String
 serverSideRender user onedriveToken =
-  R.renderToString (R.createFactory (component $ Just user) { onedriveToken })
+  let
+    props =
+      { onedriveToken
+      , db: Nothing
+      }
+  in
+   R.renderToString (R.createFactory (component (Just user) Nothing) props)
