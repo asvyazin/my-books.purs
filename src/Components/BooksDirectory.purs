@@ -1,8 +1,11 @@
 module Components.BooksDirectory where
 
 
+import Control.Error.Util
 import Control.Monad.Aff
+import Control.Monad.Eff.Class
 import Control.Monad.Eff.Exception
+import Control.Monad.Maybe.Trans
 import Data.Maybe
 import Data.String
 import Network.HTTP.Affjax
@@ -15,6 +18,7 @@ import qualified Thermite as T
 import Common.Monad
 import Common.Settings
 import Common.OneDriveApi
+import Components.AjaxLoader
 import qualified Components.OneDriveFileTree as FileTree
 import qualified Components.Wrappers.Button as Button
 import qualified Components.Wrappers.Glyphicon as Glyphicon
@@ -31,6 +35,7 @@ type Props =
 type State =
   { directory :: Maybe DirectoryInfo
   , showModal :: Boolean
+  , stateLoaded :: Boolean
   }
 
 
@@ -60,11 +65,11 @@ getDirectoryInfo token itemId = do
        maybe reference.path (\i -> drop (i + 1) reference.path) idx
 
 
-spec :: forall eff refs. T.Spec (ajax :: AJAX, err :: EXCEPTION, refs :: R.ReactRefs refs, state :: R.ReactState R.ReadWrite, props :: R.ReactProps, pouchdb :: DB.POUCHDB | eff) State Props Action
+spec :: forall eff. T.Spec (ajax :: AJAX, err :: EXCEPTION, pouchdb :: DB.POUCHDB | eff) State Props Action
 spec =
   T.simpleSpec performAction render
   where
-    performAction :: T.PerformAction (ajax :: AJAX, err :: EXCEPTION, refs :: R.ReactRefs refs, state :: R.ReactState R.ReadWrite, props :: R.ReactProps, pouchdb :: DB.POUCHDB | eff) State Props Action
+    performAction :: T.PerformAction (ajax :: AJAX, err :: EXCEPTION, pouchdb :: DB.POUCHDB | eff) State Props Action
     performAction HideModal _ state update =
       update $ state { showModal = false }
 
@@ -79,9 +84,13 @@ spec =
 
     render :: T.Render State Props Action
     render dispatch props state _ =
-      [ maybe renderChooseButton renderChoosedDirectory state.directory
-      , renderChooseModal state.showModal
-      ]
+      if not state.stateLoaded
+      then
+        [ ajaxLoader ]
+      else
+        [ maybe renderChooseButton renderChoosedDirectory state.directory
+        , renderChooseModal state.showModal
+        ]
       where
         renderChooseButton =
           let
@@ -140,3 +149,32 @@ spec =
               [ R.text "Close" ]
             ]
           ]
+
+
+reactClass :: R.ReactClass Props
+reactClass =
+  R.createClass reactSpec.spec { componentDidMount = componentDidMount }
+  where
+    reactSpec =
+      T.createReactSpec spec initialState
+
+    initialState =
+      { directory: Nothing
+      , showModal: false
+      , stateLoaded: false
+      }
+
+    componentDidMount this = launchAff $ do
+      props <- liftEff $ R.getProps this
+      void $ runMaybeT $ do
+        db <- hoistMaybe props.db
+        settings <- MaybeT $ tryGetSettings db
+        directory <- lift $ getDirectoryInfo props.onedriveToken $ getBooksDirectory settings
+        lift $ liftEff $ R.transformState this (_ { directory = Just directory, stateLoaded = true })
+      where
+        getBooksDirectory (Settings s) = s.booksDirectory
+
+
+booksDirectory :: Props -> R.ReactElement
+booksDirectory props =
+  R.createElement reactClass props []

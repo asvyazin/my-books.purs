@@ -1,6 +1,5 @@
 module Entries.Login.Class where
 
-import Data.Lens
 import Data.List
 import Data.Maybe
 import Data.String (joinWith)
@@ -16,16 +15,20 @@ import qualified Components.Wrappers.Button as Button
 import qualified Components.Wrappers.Glyphicon as Glyphicon
 
 
-type Model =
-  { header :: H.Model
-  , clientId :: String
+type Props =
+  { clientId :: String
   , scope :: String
   }
 
 
-render :: forall props. T.Render Model props (Array R.ReactElement)
-render dispatch _ state _ =
-  [ R.div
+render :: forall state. T.Render state Props (Array R.ReactElement)
+render dispatch props _ _ =
+  [ H.header
+    { title: "MyBooks"
+    , userName: Nothing
+    , error: Nothing
+    }
+  , R.div
     [ RP.className "col-md-offset-5 col-md-2" ]
     [ Button.button
       { bsSize: "large"
@@ -38,8 +41,8 @@ render dispatch _ state _ =
   ]
   where
     loginParams =
-      [ (Tuple "client_id" state.clientId)
-      , (Tuple "scope" state.scope)
+      [ (Tuple "client_id" props.clientId)
+      , (Tuple "scope" props.scope)
       , (Tuple "response_type" "code")
       , (Tuple "redirect_uri" "http://localhost:8000/onedrive-redirect")
       ]
@@ -60,28 +63,11 @@ buildUrl baseUrl params =
       joinWith "&" $ fromList $ map formatParam params
 
 
-header :: LensP Model H.Model
-header =
-  lens _.header (_ { header = _ })
-
-
-initialState :: Model
-initialState =
-  { header :
-    { title : "MyBooks"
-    , userName : Nothing
-    , error : Nothing
-    }
-  , scope : "wl.signin onedrive.readonly"
-  , clientId : "000000004816D42C"
-  }
-
-
-spec :: forall eff props. T.Spec eff Model props (Array R.ReactElement)
+spec :: forall eff state. T.Spec eff state Props (Array R.ReactElement)
 spec =
-  T.focusState header H.spec <> T.simpleSpec T.defaultPerformAction render
+  T.simpleSpec T.defaultPerformAction render
 
 
-component :: forall props. R.ReactClass props
+component :: R.ReactClass Props
 component =
-  T.createClass spec initialState
+  T.createClass spec {}

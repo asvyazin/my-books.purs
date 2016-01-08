@@ -7,4 +7,10 @@ import Entries.Login.Class
 
 serverSideRender :: String
 serverSideRender =
-  R.renderToString (R.createFactory component {})
+  let
+    props =
+      { scope : "wl.signin onedrive.readonly"
+      , clientId : "000000004816D42C"
+      }
+  in
+   R.renderToString (R.createFactory component props)

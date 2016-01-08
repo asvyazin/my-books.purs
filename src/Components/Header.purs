@@ -3,26 +3,27 @@ module Components.Header where
 import Data.Array
 import Data.Maybe
 import Prelude
+import qualified React as R
 import qualified React.DOM as R
 import qualified React.DOM.Props as RP
 import qualified Thermite as T
 
 
-type Model =
+type Props =
   { title :: String
   , userName :: Maybe String
   , error :: Maybe String
   }
 
               
-render :: forall props action. T.Render Model props action
-render dispatch _ state _ =
+render :: forall state action. T.Render state Props action
+render dispatch props _ _ =
   [ R.nav
     [ RP.className "navbar navbar-default"
     , RP.role "navigation" ]
     [ R.div
       [ RP.className "navbar-header navbar-brand" ]
-      [ R.text state.title ]
+      [ R.text props.title ]
     , R.ul
       [ RP.className "nav navbar-nav" ]
       [ R.li'
@@ -34,8 +35,8 @@ render dispatch _ state _ =
     , R.ul
       [ RP.className "nav navbar-nav navbar-right" ]
       [ R.li'
-        (catMaybes [ renderUserName <$> state.userName
-                   , renderError <$> state.error ])
+        (catMaybes [ renderUserName <$> props.userName
+                   , renderError <$> props.error ])
       ]
     ]
   ]
@@ -46,6 +47,11 @@ render dispatch _ state _ =
       R.div [ RP.className "alert alert-danger" ] [ R.text error ]
 
 
-spec :: forall eff props action. T.Spec eff Model props action
+spec :: forall eff state action. T.Spec eff state Props action
 spec =
   T.simpleSpec T.defaultPerformAction render
+
+
+header :: Props -> R.ReactElement
+header props =
+  R.createElement (T.createClass spec {}) props []

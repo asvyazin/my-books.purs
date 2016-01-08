@@ -13,6 +13,7 @@ serverSideRender user onedriveToken =
     props =
       { onedriveToken
       , db: Nothing
+      , userName: Just user
       }
   in
-   R.renderToString (R.createFactory (component (Just user) Nothing) props)
+   R.renderToString (R.createFactory component props)

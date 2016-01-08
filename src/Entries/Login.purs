@@ -17,4 +17,10 @@ main :: Eff (dom :: DOM) Unit
 main = do
   node <- htmlDocumentToParentNode <$> (window >>= document)
   container <- (fromJust <<< toMaybe) <$> querySelector ".application" node
-  void $ R.render (R.createFactory component {}) container
+  let
+    props =
+      { scope : "wl.signin onedrive.readonly"
+      , clientId : "000000004816D42C"
+      }
+
+  void $ R.render (R.createFactory component props) container

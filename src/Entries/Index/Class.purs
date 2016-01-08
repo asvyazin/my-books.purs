@@ -1,7 +1,6 @@
 module Entries.Index.Class where
 
 import Control.Monad.Eff.Exception
-import Data.Lens
 import Data.Maybe
 import Network.HTTP.Affjax
 import Prelude
@@ -16,55 +15,28 @@ import qualified Libs.PouchDB as DB
 type Props =
   { onedriveToken :: String
   , db :: Maybe DB.PouchDB
+  , userName :: Maybe String
   }
 
 
-type Model =
-  { header :: H.Model
-  , booksDirectory :: BD.State
-  }
-
-
-data Action
-  = BooksDirectoryAction BD.Action
-
-
-header :: LensP Model H.Model
-header =
-  lens _.header (_ { header = _ })
-
-
-booksDirectory :: LensP Model BD.State
-booksDirectory =
-  lens _.booksDirectory (_ { booksDirectory = _ })
-
-
-booksDirectoryAction :: PrismP Action BD.Action
-booksDirectoryAction =
-  prism' BooksDirectoryAction tryBD
-  where
-    tryBD (BooksDirectoryAction a) = Just a
-
-
-initialState :: Maybe String -> Maybe BD.DirectoryInfo -> Model
-initialState user directory =
-  { header :
-    { title : "MyBooks"
-    , userName : user
-    , error : Nothing
-    }
-  , booksDirectory :
-    { directory
-    , showModal : false
-    }
-  }
-
-
-spec :: forall eff refs. T.Spec (ajax :: AJAX, err :: EXCEPTION, refs :: R.ReactRefs refs, state :: R.ReactState R.ReadWrite, props :: R.ReactProps, pouchdb :: DB.POUCHDB | eff) Model Props Action
+spec :: forall eff state action. T.Spec (ajax :: AJAX, err :: EXCEPTION, pouchdb :: DB.POUCHDB | eff) state Props action
 spec =
-  T.focusState header H.spec <> T.focus booksDirectory booksDirectoryAction BD.spec
+  T.simpleSpec T.defaultPerformAction render
+  where
+    render :: T.Render state Props action
+    render _ props _ _ =
+      [ H.header
+        { title: "MyBooks"
+        , userName: props.userName
+        , error: Nothing
+        }
+      , BD.booksDirectory
+        { onedriveToken: props.onedriveToken
+        , db: props.db
+        }
+      ]
 
 
-component :: Maybe String -> Maybe BD.DirectoryInfo -> R.ReactClass Props
-component user directory =
-  T.createClass spec $ initialState user directory
+component :: R.ReactClass Props
+component =
+  T.createClass spec {}

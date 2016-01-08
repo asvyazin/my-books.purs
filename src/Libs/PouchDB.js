@@ -19,7 +19,6 @@ function putFFI (db) {
 	return function (errorCallback) {
 	    return function (successCallback) {
 		return function () {
-		    console.log('put', doc);
 		    db.put(doc, function (error, result) {
 			if (error) {
 			    errorCallback(error)();

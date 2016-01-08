@@ -22,8 +22,6 @@ import Web.Cookies
 
 import Common.Monad
 import Common.OneDriveApi
-import Common.Settings
-import qualified Components.BooksDirectory as BD
 import Entries.Index.Class
 
 
@@ -37,13 +35,14 @@ main = launchAff $ do
   liftEff' (renderMain user onedriveToken) >>= guardEither
     
 
-renderMain :: forall e. String -> String -> Eff (dom :: DOM, pouchdb :: DB.POUCHDB, err :: EXCEPTION, ajax :: AJAX | e) Unit
-renderMain user onedriveToken = launchAff $ do
-  db <- liftEff $ DB.newPouchDB "MyBooks.purs"
-  settings <- tryGetSettings db
-  directory <- maybe (return Nothing) (\ (Settings s) -> Just <$> BD.getDirectoryInfo onedriveToken s.booksDirectory) settings
-  liftEff $ do
+renderMain :: forall e. String -> String -> Eff (dom :: DOM, pouchdb :: DB.POUCHDB, ajax :: AJAX | e) Unit
+renderMain user onedriveToken = do
+    db <- DB.newPouchDB "MyBooks.purs"
     node <- htmlDocumentToParentNode <$> (window >>= document)
     container <- (fromJust <<< toMaybe) <$> querySelector ".application" node
-    let props = { onedriveToken, db: Just db }
-    void $ R.render (R.createFactory (component (Just user) directory) props) container
+    let props =
+          { onedriveToken
+          , db: Just db
+          , userName: Just user
+          }
+    void $ R.render (R.createFactory component props) container
