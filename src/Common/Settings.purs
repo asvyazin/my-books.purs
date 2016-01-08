@@ -1,6 +1,7 @@
 module Common.Settings where
 
 
+import Control.Error.Util
 import Control.Monad.Eff.Exception
 import Data.Argonaut.Combinators
 import Data.Argonaut.Core
@@ -27,7 +28,7 @@ newtype Settings =
 
 instance decodeJsonSettings :: DecodeJson Settings where
   decodeJson o = do
-    jObj <- mFail "Expected object" $ toObject o
+    jObj <- note "Expected object" $ toObject o
     _id <- jObj .? "_id"
     _rev <- jObj .?? "_rev"
     booksDirectory <- jObj .?? "booksDirectory"

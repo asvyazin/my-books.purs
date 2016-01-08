@@ -21,6 +21,7 @@
     "purescript-argonaut-codecs": "~0.5.1",
     "purescript-exceptions": "~0.3.4",
     "purescript-foreign": "~0.7.2",
-    "purescript-transformers": "~0.8.4"
+    "purescript-transformers": "~0.8.4",
+    "purescript-errors": "~0.1.4"
   }
 }

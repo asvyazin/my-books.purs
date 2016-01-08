@@ -1,6 +1,7 @@
 module Common.OneDriveApi where
 
 
+import Control.Error.Util
 import Control.Monad.Aff
 import Control.Monad.Eff.Exception
 import Control.Monad.Error.Class
@@ -39,7 +40,7 @@ instance showUserInfo :: Show UserInfo where
 
 instance decodeJsonUserInfo :: DecodeJson UserInfo where
   decodeJson json = do
-    o <- mFail "Expected object" $ toObject json
+    o <- note "Expected object" $ toObject json
     id <- o .? "id"
     name <- o .? "name"
     firstName <- o .?? "first_name"
@@ -103,21 +104,21 @@ derive instance genericOneDriveItems :: Generic OneDriveItems
 
 instance decodeJsonOneDriveFolderFacet :: DecodeJson OneDriveFolderFacet where
   decodeJson json = do
-    o <- mFail "Expected object" $ toObject json
+    o <- note "Expected object" $ toObject json
     childCount <- o .? "childCount"
     return $ OneDriveFolderFacet { childCount }
 
 
 instance decodeJsonOneDriveFileFacet :: DecodeJson OneDriveFileFacet where
   decodeJson json = do
-    o <- mFail "Expected object" $ toObject json
+    o <- note "Expected object" $ toObject json
     mimeType <- o .? "mimeType"
     return $ OneDriveFileFacet { mimeType }
 
 
 instance decodeJsonOneDriveItemReference :: DecodeJson ItemReference where
   decodeJson json = do
-    o <- mFail "Expected object" $ toObject json
+    o <- note "Expected object" $ toObject json
     driveId <- o .? "driveId"
     id <- o .? "id"
     path <- o .? "path"
@@ -126,7 +127,7 @@ instance decodeJsonOneDriveItemReference :: DecodeJson ItemReference where
 
 instance decodeJsonOneDriveItem :: DecodeJson OneDriveItem where
   decodeJson json = do
-    o <- mFail "Expected object" $ toObject json
+    o <- note "Expected object" $ toObject json
     id <- o .? "id"
     name <- o .? "name"
     folder <- o .?? "folder"
@@ -137,9 +138,9 @@ instance decodeJsonOneDriveItem :: DecodeJson OneDriveItem where
 
 instance decodeJsonOneDriveItems :: DecodeJson OneDriveItems where
   decodeJson json = do
-    o <- mFail "Expected object" $ toObject json
-    jValue <- mFail "Expected 'value'" $ M.lookup "value" o
-    jArr <- mFail "Expected array" $ toArray jValue
+    o <- note "Expected object" $ toObject json
+    jValue <- note "Expected 'value'" $ M.lookup "value" o
+    jArr <- note "Expected array" $ toArray jValue
     value <- traverse decodeJson jArr
     return $ OneDriveItems { value }
 
