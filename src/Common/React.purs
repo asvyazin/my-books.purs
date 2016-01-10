@@ -25,3 +25,13 @@ mapPropsWithState convert spec2 =
 
     render dispatch p1 s children =
       view T._render spec2 dispatch (convert p1 s) s children
+
+
+withProps :: forall eff props state action. (props -> T.Spec eff state props action) -> T.Spec eff state props action
+withProps f =
+  T.simpleSpec performAction render
+  where
+    performAction a p s u =
+      view T._performAction (f p) a p s u
+    render d p s c =
+      view T._render (f p) d p s c

@@ -2,6 +2,7 @@ module Components.BooksDirectory where
 
 
 import Common.React
+import qualified Components.ChooseDirectoryModal as ChooseDirectoryModal
 import Control.Error.Util
 import Control.Monad.Aff
 import Control.Monad.Eff.Class
@@ -10,6 +11,7 @@ import Control.Monad.Maybe.Trans
 import Data.Foldable
 import Data.Lens
 import Data.Maybe
+import Data.Monoid
 import Data.String
 import Data.Tuple
 import Network.HTTP.Affjax
@@ -26,7 +28,6 @@ import qualified Components.AjaxLoader as AjaxLoader
 import qualified Components.OneDriveFileTree as FileTree
 import qualified Components.Wrappers.Button as Button
 import qualified Components.Wrappers.Glyphicon as Glyphicon
-import qualified Components.Wrappers.Modal as Modal
 import qualified Libs.PouchDB as DB
 
 
@@ -38,13 +39,12 @@ type Props =
 
 type State =
   { directory :: Maybe DirectoryInfo
-  , showModal :: Boolean
   , stateLoaded :: Boolean
-  , modalState :: FileTree.State
+  , modalState :: ChooseDirectoryModal.State
   }
 
 
-modalState :: LensP State FileTree.State
+modalState :: LensP State ChooseDirectoryModal.State
 modalState =
   lens _.modalState (_ { modalState = _ })
 
@@ -55,18 +55,8 @@ type DirectoryInfo =
   }
 
 
-data Action
-  = HideModal
-  | ShowModal
-  | FileTreeAction FileTree.Action
-
-
-fileTreeAction :: PrismP Action FileTree.Action
-fileTreeAction =
-  prism' FileTreeAction getFileTreeAction
-  where
-    getFileTreeAction (FileTreeAction x) = Just x
-    getFileTreeAction _ = Nothing
+type Action =
+  ChooseDirectoryModal.Action
 
 
 getDirectoryInfo :: forall e. String -> Maybe String -> Aff (ajax :: AJAX | e) DirectoryInfo
@@ -94,29 +84,6 @@ wrapMiddle =
       ]
 
 
-wrapModal :: forall eff props. T.Spec eff State props Action -> T.Spec eff State props Action
-wrapModal =
-  over T._render wrapRender
-  where
-    wrapRender origRender dispatch p s c =
-      [ Modal.modal
-        { show: s.showModal
-        , onHide: dispatch HideModal
-        }
-        [ Modal.header
-          { closeButton: true }
-          [ R.text "Choose directory" ]
-        , Modal.body {}
-          (origRender dispatch p s c)
-        , Modal.footer {}
-          [ Button.button
-            { onClick: dispatch HideModal }
-            [ R.text "Close" ]
-          ]
-        ]
-      ]
-
-
 chooseButton :: forall eff. T.Spec eff State Props Action
 chooseButton =
   T.simpleSpec T.defaultPerformAction render
@@ -126,7 +93,7 @@ chooseButton =
       let
         buttonProps =
           { bsSize : "large"
-          , onClick : dispatch ShowModal
+          , onClick : dispatch ChooseDirectoryModal.ShowModal
           }
       in
        [ Button.button buttonProps
@@ -149,7 +116,7 @@ choosedDirectory directory =
         [ RP.className "default" ]
         [ R.text directory.path ]
       , Button.button
-        { onClick: dispatch ShowModal
+        { onClick: dispatch ChooseDirectoryModal.ShowModal
         , bsStyle: "link"
         }
         [ R.text "Choose another" ]
@@ -158,42 +125,37 @@ choosedDirectory directory =
 
 spec :: forall eff. T.Spec (ajax :: AJAX, err :: EXCEPTION, pouchdb :: DB.POUCHDB | eff) State Props Action
 spec =
-  T.simpleSpec performAction T.defaultRender
-  <> T.withState (\st ->
-    if not st.stateLoaded
-    then
-      AjaxLoader.spec
-    else
-      fold
-      [ wrapMiddle $ case st.directory of
-           Nothing ->
-             chooseButton
-           Just directory ->
-             choosedDirectory directory
-      , wrapModal $ mapProps (\p ->
-                               { name: "root"
-                               , onedriveToken: p.onedriveToken
-                               , itemId: Nothing
-                               , key: "root"
-                               }) $ T.focus modalState fileTreeAction FileTree.spec
-      ])
+  fold
+  [ T.simpleSpec performAction T.defaultRender
+  , withProps (\p ->
+                T.withState (\st ->
+                              if not st.stateLoaded
+                              then
+                                AjaxLoader.spec
+                              else
+                                fold
+                                [ wrapMiddle $ case st.directory of
+                                     Nothing ->
+                                       chooseButton
+                                     Just directory ->
+                                       choosedDirectory directory
+                                , maybe mempty (\db -> mapProps (\pp -> { onedriveToken: pp.onedriveToken, db }) $ T.focusState modalState ChooseDirectoryModal.spec) p.db
+                                ]
+                            )
+              )
+  ]
   where
     performAction :: T.PerformAction (ajax :: AJAX, err :: EXCEPTION, pouchdb :: DB.POUCHDB | eff) State Props Action
-    performAction HideModal _ state update =
-      update $ state { showModal = false }
-
-    performAction ShowModal _ state update =
-      update $ state { showModal = true }
-
-    performAction (FileTreeAction action) props state update =
+    performAction (ChooseDirectoryModal.FileTreeAction action) props state update =
       case FileTree.unwrapChildAction action of
         Tuple itemId FileTree.SelectDirectory ->
           launchAff $ do
             directory <- getDirectoryInfo props.onedriveToken itemId
-            maybe (return unit) (\db -> void $ updateSettings db (\(Settings s) -> Settings (s { booksDirectory = itemId }))) props.db
-            (liftEff' $ update $ state { showModal = false, directory = Just directory }) >>= guardEither
+            (liftEff' $ update $ state { directory = Just directory }) >>= guardEither
         _ ->
           pure unit
+    performAction _ _ _ _ =
+      pure unit
 
 
 reactClass :: R.ReactClass Props
@@ -205,9 +167,8 @@ reactClass =
 
     initialState =
       { directory: Nothing
-      , showModal: false
       , stateLoaded: false
-      , modalState: FileTree.defaultState
+      , modalState: ChooseDirectoryModal.defaultState
       }
 
     componentDidMount this = launchAff $ do
