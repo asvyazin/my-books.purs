@@ -1,5 +1,6 @@
 module Entries.Login.Class where
 
+import Common.React
 import Data.List
 import Data.Maybe
 import Data.String (joinWith)
@@ -10,7 +11,7 @@ import qualified React.DOM as R
 import qualified React.DOM.Props as RP
 import qualified Thermite as T
 
-import qualified Components.Header as H
+import qualified Components.Header as Header
 import qualified Components.Wrappers.Button as Button
 import qualified Components.Wrappers.Glyphicon as Glyphicon
 
@@ -21,33 +22,32 @@ type Props =
   }
 
 
-render :: forall state. T.Render state Props (Array R.ReactElement)
-render dispatch props _ _ =
-  [ H.header
-    { title: "MyBooks"
-    , userName: Nothing
-    , error: Nothing
-    }
-  , R.div
-    [ RP.className "col-md-offset-5 col-md-2" ]
-    [ Button.button
-      { bsSize: "large"
-      , href: loginUrl
-      }
-      [ Glyphicon.glyphicon' "cloud"
-      , R.text " Login to OneDrive"
-      ]
-    ]
-  ]
+loginButton :: forall eff state action. T.Spec eff state Props action
+loginButton =
+  T.simpleSpec T.defaultPerformAction render
   where
-    loginParams =
+    render dispatch props _ _ =
+      [ R.div
+        [ RP.className "col-md-offset-5 col-md-2" ]
+        [ Button.button
+          { bsSize: "large"
+          , href: loginUrl props
+          }
+          [ Glyphicon.glyphicon' "cloud"
+          , R.text " Login to OneDrive"
+          ]
+        ]
+      ]
+
+    loginParams props =
       [ (Tuple "client_id" props.clientId)
       , (Tuple "scope" props.scope)
       , (Tuple "response_type" "code")
       , (Tuple "redirect_uri" "http://localhost:8000/onedrive-redirect")
       ]
+
     loginUrl =
-      buildUrl "https://login.live.com/oauth20_authorize.srf" $ toList loginParams 
+      buildUrl "https://login.live.com/oauth20_authorize.srf" <<< toList <<< loginParams
 
 
 buildUrl :: String -> List (Tuple String String) -> String
@@ -58,14 +58,20 @@ buildUrl baseUrl params =
   where
     formatParam (Tuple p v) =
       p ++ "=" ++ v
-      
+
     queryString =
       joinWith "&" $ fromList $ map formatParam params
 
 
-spec :: forall eff state. T.Spec eff state Props (Array R.ReactElement)
+spec :: forall eff state action. T.Spec eff state Props action
 spec =
-  T.simpleSpec T.defaultPerformAction render
+  mapProps (\_ -> headerProps) Header.spec <> loginButton
+  where
+    headerProps =
+      { title: "MyBooks"
+      , userName: Nothing
+      , error: Nothing
+      }
 
 
 component :: R.ReactClass Props

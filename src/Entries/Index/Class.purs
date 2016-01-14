@@ -1,15 +1,17 @@
 module Entries.Index.Class where
 
+
+import Common.React
+import qualified Components.BooksDirectory as BooksDirectory
+import qualified Components.Header as Header
 import Control.Monad.Eff.Exception
+import Data.Foldable
 import Data.Maybe
+import qualified Libs.PouchDB as DB
 import Network.HTTP.Affjax
 import Prelude
 import qualified React as R
 import qualified Thermite as T
-
-import qualified Components.Header as H
-import qualified Components.BooksDirectory as BD
-import qualified Libs.PouchDB as DB
 
 
 type Props =
@@ -21,20 +23,23 @@ type Props =
 
 spec :: forall eff state action. T.Spec (ajax :: AJAX, err :: EXCEPTION, pouchdb :: DB.POUCHDB | eff) state Props action
 spec =
-  T.simpleSpec T.defaultPerformAction render
+  fold [ mapProps convertToHeaderProps Header.spec
+       , T.simpleSpec T.defaultPerformAction renderBooksDirectory
+       ]
   where
-    render :: T.Render state Props action
-    render _ props _ _ =
-      [ H.header
-        { title: "MyBooks"
-        , userName: props.userName
-        , error: Nothing
-        }
-      , BD.booksDirectory
-        { onedriveToken: props.onedriveToken
-        , db: props.db
-        }
-      ]
+    convertToHeaderProps p =
+      { title: "MyBooks"
+      , userName: p.userName
+      , error: Nothing
+      }
+
+    renderBooksDirectory _ props _ _ =
+      [ BooksDirectory.booksDirectory $ convertToBooksDirectoryProps props ]
+
+    convertToBooksDirectoryProps p =
+      { onedriveToken: p.onedriveToken
+      , db: p.db
+      }
 
 
 component :: R.ReactClass Props
