@@ -80,9 +80,7 @@ type ChoosedDirectoryProps =
 
 choosedDirectory :: forall eff. T.Spec (ajax :: AJAX, err :: EXCEPTION, pouchdb :: DB.POUCHDB | eff) State ChoosedDirectoryProps Action
 choosedDirectory =
-  wrapMiddle $ fold [ T.simpleSpec T.defaultPerformAction render
-                    , mapProps convertProps $ T.focusState modalState ChooseDirectoryModal.spec
-                    ]
+  wrapMiddle $ T.simpleSpec T.defaultPerformAction render
   where
     render dispatch props _ _ =
       [ R.span
@@ -147,13 +145,22 @@ spec =
                       Just _ ->
                         mapPropsWithState tryGetChoosedDirectoryProps $ maybeProps choosedDirectory
                 )
-  , mapProps (\p -> p.db >>= (\db -> Just { onedriveToken: p.onedriveToken, db })) $ maybeProps $ T.focusState modalState ChooseDirectoryModal.spec
+  , mapProps tryGetChooseDirectoryModalProps $ maybeProps $ T.focusState modalState ChooseDirectoryModal.spec
   ]
   where
     tryGetChoosedDirectoryProps p s = do
       dir <- s.directory
       db <- p.db
-      return { onedriveToken: p.onedriveToken, directory: dir, db }
+      return { onedriveToken: p.onedriveToken
+             , directory: dir
+             , db
+             }
+
+    tryGetChooseDirectoryModalProps p = do
+      db <- p.db
+      return { onedriveToken: p.onedriveToken
+             , db
+             }
 
     performAction (ChooseDirectoryModal.FileTreeAction action) props state update =
       processFileTreeAction action props state update

@@ -101,5 +101,9 @@ spec =
             (liftEff' $ update $ state { show = false }) >>= guardEither
         _ ->
           pure unit
-    performAction _ _ _ _ =
-      pure unit
+
+    performAction ShowModal _ state update =
+      update $ state { show = true }
+
+    performAction HideModal _ state update =
+      update $ state { show = false }
