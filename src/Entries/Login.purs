@@ -9,7 +9,8 @@ import DOM.HTML.Types
 import DOM.HTML.Window
 import DOM.Node.ParentNode
 import Prelude
-import qualified React as R
+import React as R
+import ReactDOM as R
 
 import Entries.Login.Class
 

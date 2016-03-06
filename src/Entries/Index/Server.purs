@@ -3,7 +3,8 @@ module Entries.Index.Server where
 
 import Data.Maybe
 import Prelude
-import qualified React as R
+import React as R
+import ReactDOM as R
 import Entries.Index.Class
 
 

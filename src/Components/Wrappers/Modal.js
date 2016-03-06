@@ -2,19 +2,20 @@
 
 // module Components.Wrappers.Modal
 
-import { Modal } from "react-bootstrap";
+
+var Modal = require('react-bootstrap').Modal;
 
 
-export const modalFFI = Modal;
+exports.modalFFI = Modal;
 
 
-export const headerFFI = Modal.Header;
+exports.headerFFI = Modal.Header;
 
 
-export const titleFFI = Modal.Title;
+exports.titleFFI = Modal.Title;
 
 
-export const bodyFFI = Modal.Body;
+exports.bodyFFI = Modal.Body;
 
 
-export const footerFFI = Modal.Footer;
+exports.footerFFI = Modal.Footer;

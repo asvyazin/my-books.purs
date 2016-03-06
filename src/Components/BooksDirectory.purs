@@ -145,6 +145,7 @@ spec =
                       Just _ ->
                         mapPropsWithState tryGetChoosedDirectoryProps $ maybeProps choosedDirectory
                 )
+  , T.simpleSpec performAction T.defaultRender
   , mapProps tryGetChooseDirectoryModalProps $ maybeProps $ T.focusState modalState ChooseDirectoryModal.spec
   ]
   where
@@ -171,8 +172,9 @@ spec =
       case FileTree.unwrapChildAction action of
         Tuple itemId FileTree.SelectDirectory ->
           launchAff $ do
+            (liftEff' $ update $ \s -> s { directory = Nothing, stateLoaded = false }) >>= guardEither
             dir <- getDirectoryInfo props.onedriveToken itemId
-            (liftEff' $ update $ state { directory = Just dir }) >>= guardEither
+            (liftEff' $ update $ \s -> s { directory = Just dir, stateLoaded = true }) >>= guardEither
         _ ->
           pure unit
 

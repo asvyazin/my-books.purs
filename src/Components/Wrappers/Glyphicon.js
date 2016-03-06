@@ -2,8 +2,8 @@
 
 // module Components.Wrappers.Glyphicon
 
-import { Glyphicon } from "react-bootstrap";
+
+var Glyphicon = require('react-bootstrap').Glyphicon;
 
 
-export const glyphiconFFI = Glyphicon;
-
+exports.glyphiconFFI = Glyphicon;

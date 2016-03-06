@@ -4,7 +4,7 @@ module Common.React where
 import Data.Lens
 import Data.Maybe
 import Prelude
-import qualified Thermite as T
+import Thermite as T
 
 
 mapProps :: forall props1 props2 eff state action. (props1 -> props2) -> T.Spec eff state props2 action -> T.Spec eff state props1 action
@@ -48,7 +48,7 @@ maybeState origSpec =
         Nothing ->
           pure unit
         Just s' ->
-          view T._performAction origSpec a p s' (u <<< Just)
+          view T._performAction origSpec a p s' (u <<< map)
     render d p s c =
       case s of
         Nothing ->

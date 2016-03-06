@@ -4,17 +4,17 @@
 // module Libs.PouchDB
 
 
-import PouchDB from "pouchdb";
+var PouchDB = require('pouchdb');
 
 
-function newPouchDB (name) {
+exports.newPouchDB = function (name) {
     return function () {
 	return new PouchDB(name);
     };
 }
 
 
-function putFFI (db) {
+exports.putFFI = function (db) {
     return function (doc) {
 	return function (errorCallback) {
 	    return function (successCallback) {
@@ -34,7 +34,7 @@ function putFFI (db) {
 }
 
 
-function postFFI (db) {
+exports.postFFI = function (db) {
     return function (doc) {
 	return function (errorCallback) {
 	    return function (successCallback) {
@@ -54,7 +54,7 @@ function postFFI (db) {
 }
 
 
-function getFFI (db) {
+exports.getFFI = function (db) {
     return function (docId) {
 	return function (errorCallback) {
 	    return function (successCallback) {
@@ -74,7 +74,7 @@ function getFFI (db) {
 }
 
 
-function tryGetFFI (db) {
+exports.tryGetFFI = function (db) {
     return function (docId) {
 	return function (errorCallback) {
 	    return function (successCallback) {
@@ -92,6 +92,3 @@ function tryGetFFI (db) {
 	};
     };
 }
-
-
-export { newPouchDB, putFFI, postFFI, getFFI, tryGetFFI };

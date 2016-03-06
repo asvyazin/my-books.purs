@@ -150,15 +150,15 @@ spec =
         performActionAff =
           if (not state.collapsed)
           then
-            liftEff' (update (State state { collapsed = true })) >>= guardEither
+            liftEff' (update (\(State s) -> State s { collapsed = true })) >>= guardEither
           else do
-            liftEff' (update (State state { collapsed = false })) >>= guardEither
+            liftEff' (update (\(State s) -> State s { collapsed = false })) >>= guardEither
             when (not state.loaded) $ do
               childrenData <- getChildrenByItemId props.onedriveToken props.itemId
               let
                 children =
                   map child $ filter isDirectory childrenData
-              (liftEff' $ update $ State state { collapsed = false, loaded = true, children = children }) >>= guardEither
+              (liftEff' $ update $ \(State s) -> State s { collapsed = false, loaded = true, children = children }) >>= guardEither
 
         isDirectory (OneDriveItem item) =
           isJust item.folder
@@ -187,9 +187,15 @@ childrenSpec origSpec =
         childState <- hoistMaybe $ stateArr !! idx
         lift $ view T._performAction origSpec action childProps childState (update <<< modifying idx)
       where
-        modifying :: Int -> State -> Array State
-        modifying i st =
-          fromMaybe stateArr (updateAt i st stateArr)
+        modifying :: Int -> (State -> State) -> Array State -> Array State
+        modifying i f arr =
+          let
+            s' = arr !! i
+          in
+            case s' of
+              Nothing -> arr
+              Just s'' ->
+                fromMaybe arr (updateAt i (f s'') arr)
 
     render dispatch propsArr stateArr _ =
       foldl (\ els (Tuple props state) -> els <> view T._render origSpec (dispatch <<< Tuple props.itemId) props state []) [] $ zip propsArr stateArr

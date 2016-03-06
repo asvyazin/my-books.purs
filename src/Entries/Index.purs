@@ -13,10 +13,11 @@ import DOM.HTML
 import DOM.HTML.Types
 import DOM.HTML.Window
 import DOM.Node.ParentNode
-import qualified Libs.PouchDB as DB
+import Libs.PouchDB as DB
 import Network.HTTP.Affjax
 import Prelude
-import qualified React as R
+import React as R
+import ReactDOM as R
 import Web.Cookies
 
 

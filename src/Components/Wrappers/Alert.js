@@ -1,5 +1,7 @@
 // module Components.Wrappers.Alert
 
-import { Alert } from "react-bootstrap";
 
-export const alertFFI = Alert;
+var Alert = require('react-bootstrap').Alert;
+
+
+exports.alertFFI = Alert;

@@ -98,12 +98,12 @@ spec =
         Tuple itemId FileTree.SelectDirectory ->
           launchAff $ do
             void $ updateSettings props.db (\(Settings s) -> Settings (s { booksDirectory = itemId }))
-            (liftEff' $ update $ state { show = false }) >>= guardEither
+            (liftEff' $ update $ \x -> x { show = false }) >>= guardEither
         _ ->
           pure unit
 
     performAction ShowModal _ state update =
-      update $ state { show = true }
+      update $ \x -> x { show = true }
 
     performAction HideModal _ state update =
-      update $ state { show = false }
+      update $ \x -> x { show = false }

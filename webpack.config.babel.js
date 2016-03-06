@@ -1,14 +1,10 @@
+var PurescriptWebpackPlugin = require('purescript-webpack-plugin');
+
 var path = require('path');
 
-var srcs = ['src[]=bower_components/purescript-*/src/**/*.purs', 'src[]=src/**/*.purs'];
-
-var ffis = ['ffi[]=bower_components/purescript-*/src/**/*.js', 'ffi[]=src/**/*.js'];
-
-var output = 'output';
-
 var modulesDirectories = [
-    'node_modules',
-    'bower_components'
+  'node_modules',
+  'bower_components'
 ];
 
 module.exports = {
@@ -25,7 +21,7 @@ module.exports = {
     module: {
 	loaders: [{
 	    test: /\.purs$/,
-	    loader: 'purs-loader?output=' + output + '&' + srcs.concat(ffis).join('&')
+	    loader: 'purs-loader'
 	}, {
 	    test: /\.js$/,
 	    exclude: /(node_modules|bower_components)/,
@@ -33,11 +29,7 @@ module.exports = {
 	}]
     },
     resolve: {
-	root: 'src',
-	modulesDirectories: modulesDirectories,
-	extensions: ['', '.js']
+	modulesDirectories: modulesDirectories
     },
-    resolveLoader: {
-	root: path.join(__dirname, 'node_modules')
-    }
+    plugins: [new PurescriptWebpackPlugin()]
 };

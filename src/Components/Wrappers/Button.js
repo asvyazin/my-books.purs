@@ -2,8 +2,8 @@
 
 // module Components.Wrappers.Button
 
-import { Button } from "react-bootstrap";
+
+var Button = require('react-bootstrap').Button;
 
 
-export const buttonFFI = Button;
-
+exports.buttonFFI = Button;
