@@ -20,8 +20,8 @@
     "babel-preset-es2015": "^6.1.18",
     "bower": "^1.6.5",
     "bower-webpack-plugin": "^0.1.9",
-    "purescript-webpack-plugin": "^0.2.0-beta.3",
-    "purs-loader": "^0.6.0-beta.3",
+    "purescript-webpack-plugin": "^0.2.0-beta.7",
+    "purs-loader": "^0.6.0-beta.6",
     "webpack": "^1.12.10"
   },
   "babel": {
