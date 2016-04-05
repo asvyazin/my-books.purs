@@ -1,3 +1,6 @@
 [submodule "hs-duktape"]
 	path = hs-duktape
 	url = https://github.com/asvyazin/hs-duktape.git
+[submodule "epub-metadata"]
+	path = epub-metadata
+	url = https://github.com/asvyazin/epub-metadata.git
