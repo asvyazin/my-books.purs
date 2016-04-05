@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Main (main) where
 
 
@@ -19,6 +18,7 @@ import Network.Wai (queryString)
 import qualified Network.Wai.Middleware.Static as Wai
 import Onedrive (OauthTokenRequest(..), oauthTokenRequest, me, OauthTokenResponse(..))
 import ReactRender (render)
+import System.Environment (lookupEnv)
 import qualified Text.Blaze.Html.Renderer.Text as H (renderHtml)
 import qualified Text.Blaze.Html5 as H (Html,
                                         textComment,
@@ -96,33 +96,45 @@ onedriveClientSecret :: T.Text
 onedriveClientSecret = "-4tKnVPaAyIEAgYrBp8R6jTYY0zClN6c"
 
 
-main :: IO ()
-main = runSpock 8000 $ spockT id $ do
-  middleware Wai.static
-  
-  get "/" $ maybeT (redirect "/login") return $ do
-    onedriveTokenCookie <- hoistMaybeM $ cookie "onedriveToken"
-    meUser <- hoistMaybeM $ lift $ catchUnauthorizedException $ C.withManager $ me onedriveTokenCookie
-    rendered <- lift $ render "public/js/index.server.bundle.js" [toJSON $ meUser ^. displayName, toJSON onedriveTokenCookie]
-    lift $ html $ renderHtml $ indexPage rendered
+getPort :: IO Int
+getPort = do
+  maybePortStr <- lookupEnv "PORT"
+  case maybePortStr of
+    Just portStr ->
+      return $ read portStr
+    Nothing ->
+      return 8000
 
-  get "login" $ do
-    rendered <- render "public/js/login.server.bundle.js" []
-    html $ renderHtml $ loginPage rendered
+
+main :: IO ()
+main = do
+  port <- getPort
+  runSpock port $ spockT id $ do
+    middleware Wai.static
   
-  get "onedrive-redirect" $ do
-    qs <- queryString <$> request
-    let c = pa "code" qs
-    let req =
-          OauthTokenRequest
-          { clientId = onedriveClientId
-          , redirectUri = "http://localhost:8000/onedrive-redirect"
-          , clientSecret = onedriveClientSecret
-          , code = T.decodeUtf8 $ fromJust c
-          }
-    tokenResp <- lift $ C.withManager $ oauthTokenRequest req
-    setCookie "onedriveToken" (accessToken tokenResp) defaultCookieSettings
-    redirect "/"
+    get "/" $ maybeT (redirect "/login") return $ do
+      onedriveTokenCookie <- hoistMaybeM $ cookie "onedriveToken"
+      meUser <- hoistMaybeM $ lift $ catchUnauthorizedException $ C.withManager $ me onedriveTokenCookie
+      rendered <- lift $ render "public/js/index.server.bundle.js" [toJSON $ meUser ^. displayName, toJSON onedriveTokenCookie]
+      lift $ html $ renderHtml $ indexPage rendered
+
+    get "login" $ do
+      rendered <- render "public/js/login.server.bundle.js" []
+      html $ renderHtml $ loginPage rendered
+  
+    get "onedrive-redirect" $ do
+      qs <- queryString <$> request
+      let c = pa "code" qs
+      let req =
+            OauthTokenRequest
+            { clientId = onedriveClientId
+            , redirectUri = "http://localhost:8000/onedrive-redirect"
+            , clientSecret = onedriveClientSecret
+            , code = T.decodeUtf8 $ fromJust c
+            }
+      tokenResp <- lift $ C.withManager $ oauthTokenRequest req
+      setCookie "onedriveToken" (accessToken tokenResp) defaultCookieSettings
+      redirect "/"
 
   where
     pa _ [] = Nothing
