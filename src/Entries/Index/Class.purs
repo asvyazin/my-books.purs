@@ -2,16 +2,16 @@ module Entries.Index.Class where
 
 
 import Common.React
-import qualified Components.BooksDirectory as BooksDirectory
-import qualified Components.Header as Header
+import Components.BooksDirectory as BooksDirectory
+import Components.Header as Header
 import Control.Monad.Eff.Exception
 import Data.Foldable
 import Data.Maybe
-import qualified Libs.PouchDB as DB
+import Libs.PouchDB as DB
 import Network.HTTP.Affjax
 import Prelude
-import qualified React as R
-import qualified Thermite as T
+import React as R
+import Thermite as T
 
 
 type Props =

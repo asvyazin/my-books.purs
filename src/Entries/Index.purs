@@ -41,9 +41,10 @@ renderMain user onedriveToken = do
     db <- DB.newPouchDB "MyBooks.purs"
     node <- htmlDocumentToParentNode <$> (window >>= document)
     container <- (fromJust <<< toMaybe) <$> querySelector ".application" node
-    let props =
-          { onedriveToken
-          , db: Just db
-          , userName: Just user
-          }
+    let
+      props =
+        { onedriveToken
+        , db: Just db
+        , userName: Just user
+        }
     void $ R.render (R.createFactory component props) container
