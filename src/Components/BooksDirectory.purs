@@ -5,9 +5,10 @@ import Common.Monad
 import Common.OneDriveApi
 import Common.React
 import Common.Settings
-import qualified Components.AjaxLoader as AjaxLoader
-import qualified Components.ChooseDirectoryModal as ChooseDirectoryModal
-import qualified Components.OneDriveFileTree as FileTree
+import Components.AjaxLoader as AjaxLoader
+import Components.ChoosedDirectory as ChoosedDirectory
+import Components.ChooseDirectoryModal as ChooseDirectoryModal
+import Components.OneDriveFileTree as FileTree
 import Control.Monad.Aff
 import Control.Monad.Eff.Class
 import Control.Monad.Eff.Exception
@@ -16,18 +17,18 @@ import Control.Error.Util
 import Data.Foldable
 import Data.Lens
 import Data.Maybe
-import qualified Data.String as S
+import Data.String as S
 import Data.Tuple
 import Network.HTTP.Affjax
 import Prelude
-import qualified React as R
-import qualified React.DOM as R
-import qualified React.DOM.Props as RP
-import qualified Thermite as T
+import React as R
+import React.DOM as R
+import React.DOM.Props as RP
+import Thermite as T
 
-import qualified Components.Wrappers.Button as Button
-import qualified Components.Wrappers.Glyphicon as Glyphicon
-import qualified Libs.PouchDB as DB
+import Components.Wrappers.Button as Button
+import Components.Wrappers.Glyphicon as Glyphicon
+import Libs.PouchDB as DB
 
 
 type Props =
@@ -40,6 +41,12 @@ type State =
   { modalState :: ChooseDirectoryModal.State
   , stateLoaded :: Boolean
   , directory :: Maybe DirectoryInfo
+  }
+
+
+type DirectoryInfo =
+  { itemId :: Maybe String
+  , path :: String
   }
 
 
@@ -63,40 +70,6 @@ defaultState =
 
 type Action =
   ChooseDirectoryModal.Action
-
-
-type DirectoryInfo =
-  { itemId :: Maybe String
-  , path :: String
-  }
-
-
-type ChoosedDirectoryProps =
-  { directory :: DirectoryInfo
-  , onedriveToken :: String
-  , db :: DB.PouchDB
-  }
-
-
-choosedDirectory :: forall eff. T.Spec (ajax :: AJAX, err :: EXCEPTION, pouchdb :: DB.POUCHDB | eff) State ChoosedDirectoryProps Action
-choosedDirectory =
-  wrapMiddle $ T.simpleSpec T.defaultPerformAction render
-  where
-    render dispatch props _ _ =
-      [ R.span
-        [ RP.className "default" ]
-        [ R.text props.directory.path ]
-      , Button.button
-        { onClick: dispatch ChooseDirectoryModal.ShowModal
-        , bsStyle: "link"
-        }
-        [ R.text "Choose another" ]
-      ]
-
-    convertProps p =
-      { onedriveToken: p.onedriveToken
-      , db: p.db
-      }
 
 
 wrapMiddle :: forall eff state props action. T.Spec eff state props action -> T.Spec eff state props action
@@ -143,7 +116,7 @@ spec =
                       Nothing ->
                         chooseButton
                       Just _ ->
-                        mapPropsWithState tryGetChoosedDirectoryProps $ maybeProps choosedDirectory
+                        wrapMiddle $ mapPropsWithState tryGetChoosedDirectoryProps $ maybeProps ChoosedDirectory.spec
                 )
   , T.simpleSpec performAction T.defaultRender
   , mapProps tryGetChooseDirectoryModalProps $ maybeProps $ T.focusState modalState ChooseDirectoryModal.spec
@@ -152,9 +125,7 @@ spec =
     tryGetChoosedDirectoryProps p s = do
       dir <- s.directory
       db <- p.db
-      return { onedriveToken: p.onedriveToken
-             , directory: dir
-             , db
+      return { directoryPath: dir.path
              }
 
     tryGetChooseDirectoryModalProps p = do
