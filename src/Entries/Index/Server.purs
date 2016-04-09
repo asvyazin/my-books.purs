@@ -1,11 +1,10 @@
 module Entries.Index.Server where
 
 
-import Data.Maybe
-import Prelude
-import React as R
-import ReactDOM as R
-import Entries.Index.Class
+import Data.Maybe (Maybe(..))
+import React (createFactory) as R
+import ReactDOM (renderToString) as R
+import Entries.Index.Class (component)
 
 
 serverSideRender :: String -> String -> String

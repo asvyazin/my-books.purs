@@ -1,15 +1,15 @@
 module Entries.Index.Class where
 
 
-import Common.React
+import Common.React (mapProps)
 import Components.BooksDirectory as BooksDirectory
 import Components.Header as Header
-import Control.Monad.Eff.Exception
-import Data.Foldable
-import Data.Maybe
+import Control.Monad.Eff.Exception (EXCEPTION)
+import Data.Foldable (fold)
+import Data.Maybe (Maybe(..))
 import Libs.PouchDB as DB
-import Network.HTTP.Affjax
-import Prelude
+import Network.HTTP.Affjax (AJAX)
+import Prelude (($))
 import React as R
 import Thermite as T
 

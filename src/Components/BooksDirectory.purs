@@ -1,28 +1,29 @@
 module Components.BooksDirectory (booksDirectory) where
 
 
-import Common.Monad
-import Common.OneDriveApi
-import Common.React
-import Common.Settings
+import Common.Monad (guardEither)
+import Common.OneDriveApi (ItemReference(..), OneDriveItem(..), getOneDriveItem)
+import Common.React (maybeProps, mapProps, mapPropsWithState)
+import Common.Settings (Settings(..), tryGetSettings)
 import Components.AjaxLoader as AjaxLoader
 import Components.ChoosedDirectory as ChoosedDirectory
 import Components.ChooseDirectoryModal as ChooseDirectoryModal
 import Components.OneDriveFileTree as FileTree
-import Control.Monad.Aff
-import Control.Monad.Eff.Class
-import Control.Monad.Eff.Exception
-import Control.Monad.Maybe.Trans
+import Control.Monad.Aff (Aff, launchAff, liftEff')
+import Control.Monad.Eff.Class (liftEff)
+import Control.Monad.Eff.Exception (EXCEPTION)
+import Control.Monad.Maybe.Trans (runMaybeT)
+import Control.Monad.Trans (lift)
 import Control.Error.Util
-import Data.Foldable
-import Data.Lens
-import Data.Maybe
+import Data.Foldable (fold)
+import Data.Lens (LensP, over, lens)
+import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.String as S
-import Data.Tuple
-import Network.HTTP.Affjax
-import Prelude
-import React as R
-import React.DOM as R
+import Data.Tuple (Tuple(..))
+import Network.HTTP.Affjax (AJAX)
+import Prelude ((++), return, (<$>), bind, (+), ($), void, not, unit, pure, (>>=))
+import React (ReactElement, ReactClass, createElement, createClass, transformState, getProps) as R
+import React.DOM (text, div) as R
 import React.DOM.Props as RP
 import Thermite as T
 

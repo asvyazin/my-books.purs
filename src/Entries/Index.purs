@@ -1,29 +1,27 @@
 module Entries.Index where
 
 
-import Control.Monad.Aff
-import Control.Monad.Eff
-import Control.Monad.Eff.Class
-import Control.Monad.Eff.Exception
-import Data.Maybe
-import Data.Maybe.Unsafe
-import Data.Nullable
-import DOM
-import DOM.HTML
-import DOM.HTML.Types
-import DOM.HTML.Window
-import DOM.Node.ParentNode
+import Common.Monad (guardEither, guardMaybe)
+import Common.OneDriveApi (UserInfo(..), getUserInfo)
+import Control.Monad.Aff (liftEff', launchAff)
+import Control.Monad.Eff (Eff)
+import Control.Monad.Eff.Class (liftEff)
+import Control.Monad.Eff.Exception (EXCEPTION, error)
+import Data.Maybe (Maybe(..))
+import Data.Maybe.Unsafe (fromJust)
+import Data.Nullable (toMaybe)
+import DOM (DOM)
+import DOM.HTML (window)
+import DOM.HTML.Types (htmlDocumentToParentNode)
+import DOM.HTML.Window (document)
+import DOM.Node.ParentNode (querySelector)
+import Entries.Index.Class (component)
 import Libs.PouchDB as DB
-import Network.HTTP.Affjax
-import Prelude
-import React as R
-import ReactDOM as R
-import Web.Cookies
-
-
-import Common.Monad
-import Common.OneDriveApi
-import Entries.Index.Class
+import Network.HTTP.Affjax (AJAX)
+import Prelude (Unit, void, ($), (<<<), (<$>), bind, (>>=))
+import React (createFactory) as R
+import ReactDOM (render) as R
+import Web.Cookies (COOKIE, getCookie)
 
 
 main :: Eff (cookie :: COOKIE, ajax :: AJAX, dom :: DOM, err :: EXCEPTION, pouchdb :: DB.POUCHDB) Unit
