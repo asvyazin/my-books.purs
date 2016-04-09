@@ -190,9 +190,13 @@ reactClass =
       props <- liftEff $ R.getProps this
       void $ runMaybeT $ do
         db <- hoistMaybe props.db
-        settings <- MaybeT $ tryGetSettings db
-        dir <- lift $ getDirectoryInfo props.onedriveToken $ getBooksDirectory settings
-        liftEff $ R.transformState this (_ { directory = Just dir, stateLoaded = true })
+        maybeSettings <- lift $ tryGetSettings db
+        case maybeSettings of
+          Nothing ->
+            liftEff $ R.transformState this (_ { directory = Nothing, stateLoaded = true })
+          Just settings -> do
+            dir <- lift $ getDirectoryInfo props.onedriveToken $ getBooksDirectory settings
+            liftEff $ R.transformState this (_ { directory = Just dir, stateLoaded = true })
       where
         getBooksDirectory (Settings s) = s.booksDirectory
 
