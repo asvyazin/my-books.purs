@@ -36,7 +36,8 @@ main = launchAff $ do
 
 renderMain :: forall e. String -> String -> Eff (dom :: DOM, pouchdb :: DB.POUCHDB, ajax :: AJAX | e) Unit
 renderMain user onedriveToken = do
-    db <- DB.newPouchDB "MyBooks.purs"
+    db <- DB.newPouchDB "my-books"
+    void $ DB.sync db "http://localhost:5984/my-books" { live: true, retry: true }
     node <- htmlDocumentToParentNode <$> (window >>= document)
     container <- (fromJust <<< toMaybe) <$> querySelector ".application" node
     let

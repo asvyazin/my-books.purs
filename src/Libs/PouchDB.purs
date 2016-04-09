@@ -70,3 +70,12 @@ tryGet db docId = do
   return $ if isNull foreignResult
            then Nothing
            else Just $ unsafeFromForeign foreignResult
+
+
+foreign import data PouchDBSync :: *
+
+
+foreign import sync :: forall srcType destType optionsType e. srcType -> destType -> optionsType -> PouchDBEff e PouchDBSync
+
+
+foreign import cancel :: forall e. PouchDBSync -> PouchDBEff e Unit

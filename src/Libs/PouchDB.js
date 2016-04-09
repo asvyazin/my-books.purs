@@ -92,3 +92,21 @@ exports.tryGetFFI = function (db) {
 	};
     };
 }
+
+
+exports.sync = function (src) {
+    return function (dest) {
+	return function (options) {
+	    return function () {
+		return PouchDB.sync(src, dest, options);
+	    }
+	}
+    }
+}
+
+
+exports.cancel = function (sync) {
+    return function () {
+	return sync.cancel();
+    };
+}
