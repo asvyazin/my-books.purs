@@ -23,10 +23,6 @@
     "purescript-transformers": "~0.8.4",
     "purescript-errors": "~0.2.0",
     "bootstrap-theme-bootswatch-flatly": "~1.0.2",
-    "purescript-react-dom": "^0.2.0"
-  },
-  "resolutions": {
-    "purescript-react": "^0.6.0",
     "purescript-react-dom": "^0.1.0"
   }
 }

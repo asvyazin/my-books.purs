@@ -1,0 +1,8 @@
+bower_components
+node_modules
+*~
+output
+dist
+public
+tmp
+.stack-work
