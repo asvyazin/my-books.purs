@@ -5,6 +5,7 @@ import Data.List
 import Data.Maybe
 import Data.String (joinWith)
 import Data.Tuple
+import Global (encodeURIComponent)
 import Prelude
 import qualified React as R
 import qualified React.DOM as R
@@ -57,7 +58,7 @@ buildUrl baseUrl params =
   baseUrl ++ "?" ++ queryString
   where
     formatParam (Tuple p v) =
-      p ++ "=" ++ v
+      encodeURIComponent p ++ "=" ++ encodeURIComponent v
 
     queryString =
       joinWith "&" $ fromList $ map formatParam params

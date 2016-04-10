@@ -10,11 +10,12 @@ import Data.Argonaut.Core (toArray, toObject)
 import Data.Argonaut.Decode (class DecodeJson, decodeJson)
 import Data.Argonaut.Parser (jsonParser)
 import Data.Either (either)
-import Data.Generic (class Generic, gShow)
+import Data.Generic (class Generic)
 import Data.Maybe (Maybe, maybe)
 import Data.StrMap as M
 import Data.Traversable (traverse)
-import Network.HTTP.Affjax (AJAX, AffjaxRequest, AffjaxResponse, get, defaultRequest, affjax)
+import Global (encodeURIComponent)
+import Network.HTTP.Affjax (AJAX, AffjaxRequest, AffjaxResponse, defaultRequest, affjax)
 import Network.HTTP.Method (Method(GET))
 import Network.HTTP.RequestHeader (RequestHeader(RequestHeader))
 import Prelude
@@ -22,35 +23,22 @@ import Prelude
 
 newtype UserInfo =
   UserInfo
-  { id :: String
-  , name :: String
-  , firstName :: Maybe String
-  , lastName :: Maybe String
+  { _id :: String
+  , displayName :: String
   }
 
-
-derive instance genericUserInfo :: Generic UserInfo
-
-
-instance showUserInfo :: Show UserInfo where
-  show = gShow
-  
 
 instance decodeJsonUserInfo :: DecodeJson UserInfo where
   decodeJson json = do
     o <- toObject json ?>>= "Expected object"
-    id <- o .? "id"
-    name <- o .? "name"
-    firstName <- o .?? "first_name"
-    lastName <- o .?? "last_name"
-    return $ UserInfo { id, name, firstName, lastName }
+    _id <- o .? "id"
+    displayName <- o .? "name"
+    return $ UserInfo { _id, displayName }
 
 
 getUserInfo :: forall e. String -> Aff (ajax :: AJAX | e) UserInfo
-getUserInfo token = do
-  let url = "https://apis.live.net/v5.0/me?access_token=" ++ token
-  resp <- get url
-  getJson resp
+getUserInfo token =
+  doJsonRequest $ graphGetRequest token "/me"
 
 
 newtype OneDriveFolderFacet =
@@ -182,15 +170,37 @@ getOneDriveItem token itemId = do
 
 onedriveGetRequest :: String -> String -> AffjaxRequest Unit
 onedriveGetRequest token url =
+  getRequest token $ onedriveApiBaseUrl ++ url
+
+
+graphGetRequest :: String -> String -> AffjaxRequest Unit
+graphGetRequest token url =
+  getRequestTokenInUrl token $ graphApiBaseUrl ++ url
+
+
+getRequest :: String -> String -> AffjaxRequest Unit
+getRequest token url =
   defaultRequest
   { method = GET
-  , url = onedriveApiBaseUrl ++ url
-  , headers = [ RequestHeader "Authorization" ("bearer " ++ token) ]
+  , url = url
+  , headers = [ RequestHeader "Authorization" ("Bearer " ++ token) ]
+  }
+
+
+getRequestTokenInUrl :: String -> String -> AffjaxRequest Unit
+getRequestTokenInUrl token url =
+  defaultRequest
+  { method = GET
+  , url = url ++ "?access_token=" ++ encodeURIComponent token
   }
 
 
 onedriveApiBaseUrl :: String
 onedriveApiBaseUrl = "https://api.onedrive.com/v1.0"
+
+
+graphApiBaseUrl :: String
+graphApiBaseUrl = "https://apis.live.net/v5.0"
 
 
 doJsonRequest :: forall e a. (DecodeJson a) => AffjaxRequest Unit -> Aff (ajax :: AJAX | e) a

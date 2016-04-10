@@ -37,7 +37,7 @@ import qualified Text.Blaze.Html5 as H (Html,
                                         div,
                                         toValue)
 import qualified Text.Blaze.Html5.Attributes as HA
-import UserInfo (name)
+import UserInfo (displayName)
 import Web.Spock (runSpock,
                   spockT,
                   get,
@@ -103,7 +103,7 @@ main = runSpock 8000 $ spockT id $ do
   get "/" $ maybeT (redirect "/login") return $ do
     onedriveTokenCookie <- hoistMaybeM $ cookie "onedriveToken"
     meUser <- hoistMaybeM $ lift $ catchUnauthorizedException $ C.withManager $ me onedriveTokenCookie
-    rendered <- lift $ render "public/js/index.server.bundle.js" [toJSON $ meUser ^. name, toJSON onedriveTokenCookie]
+    rendered <- lift $ render "public/js/index.server.bundle.js" [toJSON $ meUser ^. displayName, toJSON onedriveTokenCookie]
     lift $ html $ renderHtml $ indexPage rendered
 
   get "login" $ do

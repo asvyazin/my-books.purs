@@ -2,11 +2,13 @@ module Common.Data.OnedriveInfo where
 
 
 import Common.Json ((.??))
-import Data.Argonaut.Core (toObject)
+import Data.Argonaut.Core (fromObject, toObject)
 import Data.Argonaut.Combinators ((:=), (~>), (?>>=), (.?))
 import Data.Argonaut.Decode (class DecodeJson)
 import Data.Argonaut.Encode (class EncodeJson)
+import Data.List (toList)
 import Data.Maybe (Maybe(Nothing))
+import Data.StrMap (fromList) as S
 import Prelude
 
 
@@ -29,11 +31,15 @@ instance decodeJsonOnedriveInfo :: DecodeJson OnedriveInfo where
 
 instance encodeJsonOnedriveInfo :: EncodeJson OnedriveInfo where
   encodeJson (OnedriveInfo info) =
-    ("_id" := info._id) ~> ("_rev" := info._rev) ~> ("token" := info.token)
+    fromObject $ S.fromList $ toList
+    [ "_id" := info._id
+    , "_rev" := info._rev
+    , "token" := info.token
+    ]
 
 
 onedriveInfoId :: String
-onedriveInfoId = "onedriveInfoId"
+onedriveInfoId = "onedriveInfo"
 
 
 defaultOnedriveInfo :: OnedriveInfo

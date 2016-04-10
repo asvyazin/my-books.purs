@@ -2,12 +2,10 @@
 module Onedrive where
 
 
-import Control.Lens ((^.))
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Reader.Class (MonadReader)
 import Data.Aeson (json')
-import Data.Aeson.Lens (key, _String)
 import Data.Aeson.Types (FromJSON,
                          parseJSON,
                          Value(String, Object),
@@ -20,7 +18,7 @@ import qualified Data.Attoparsec.ByteString as A
 import qualified Data.ByteString as B
 import Data.Conduit (($$))
 import Data.Conduit.Attoparsec (sinkParser)
-import qualified Data.Text as T (Text)
+import qualified Data.Text as T (Text, append)
 import qualified Data.Text.Encoding as T (encodeUtf8)
 import Network.HTTP.Client.Conduit (HasHttpManager
                                    , parseUrl
@@ -29,9 +27,8 @@ import Network.HTTP.Client.Conduit (HasHttpManager
                                    , RequestBody (RequestBodyBS)
                                    , requestHeaders
                                    , responseBody
-                                   , responseOpen
-                                   , queryString)
-import Network.HTTP.Types.Header (hContentType)
+                                   , responseOpen)
+import Network.HTTP.Types.Header (hContentType, hAuthorization)
 import Network.HTTP.Types.URI (renderQuery)
 import UserInfo (UserInfo, userInfoParser)
 
@@ -122,22 +119,7 @@ me :: (MonadThrow m, MonadIO m, MonadReader env m, HasHttpManager env) => T.Text
 me token = do
   initReq <- parseUrl "https://apis.live.net/v5.0/me"
   let
-    qsParams =
-      [ ("access_token", Just $ T.encodeUtf8 token ) ]
     httpReq =
-      initReq { queryString = renderQuery False qsParams }
+      initReq { requestHeaders = [(hAuthorization, T.encodeUtf8 ("Bearer " `T.append` token))] }
   httpResp <- responseOpen httpReq
   responseBody httpResp $$ sinkParser userInfoParser
-
-
-mePictureLocation :: (MonadThrow m, MonadIO m, MonadReader env m, HasHttpManager env) => T.Text -> m T.Text
-mePictureLocation token = do
-  initReq <- parseUrl "https://apis.live.net/v5.0/me/picture"
-  let
-    qsParams =
-      [ ("access_token", Just $ T.encodeUtf8 token ) ]
-    httpReq =
-      initReq { queryString = renderQuery False qsParams }
-  httpResp <- responseOpen httpReq
-  v <- responseBody httpResp $$ sinkParser json'
-  return (v ^. key "location" . _String)

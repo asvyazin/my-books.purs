@@ -2,8 +2,9 @@ module Entries.Index where
 
 
 import Common.Data.OnedriveInfo (OnedriveInfo(OnedriveInfo), defaultOnedriveInfo, onedriveInfoId)
+import Common.Data.UserInfo (UserInfo(UserInfo), userInfoId) as U
 import Common.Monad (guardEither, guardMaybe)
-import Common.OneDriveApi (UserInfo(..), getUserInfo)
+import Common.OneDriveApi (getUserInfo, UserInfo(UserInfo))
 import Control.Monad (when)
 import Control.Monad.Aff (liftEff', launchAff)
 import Control.Monad.Eff (Eff)
@@ -32,22 +33,46 @@ main :: Eff (cookie :: COOKIE, ajax :: AJAX, dom :: DOM, err :: EXCEPTION, pouch
 main = launchAff $ do
   onedriveToken <-
     liftEff (getCookie "onedriveToken") >>= guardMaybe (error "OneDrive token expected")
-  UserInfo userInfo <- getUserInfo onedriveToken
+  u@(UserInfo userInfo) <- getUserInfo onedriveToken
   let
     dbName =
-      encodeURIComponent $ "my-books/" ++ userInfo.id
+      encodeURIComponent $ "my-books/" ++ userInfo._id
     remoteDb =
       "http://localhost:5984/" ++ dbName
   localDb <- liftEff $ DB.newPouchDB dbName
   void $ liftEff $ DB.sync localDb remoteDb { live: true, retry: true }
   updateOneDriveInfoInDbIfNeeded localDb onedriveToken
-  liftEff' (renderMain userInfo.name onedriveToken localDb) >>= guardEither
+  updateUserInfoInDbIfNeeded localDb u
+  liftEff' (renderMain userInfo.displayName onedriveToken localDb) >>= guardEither
 
 
 updateOneDriveInfoInDbIfNeeded :: forall e. DB.PouchDB -> String -> DB.PouchDBAff e Unit
 updateOneDriveInfoInDbIfNeeded db onedriveToken = do
   OnedriveInfo onedriveInfo <- fromMaybe defaultOnedriveInfo <$> DB.tryGetJson db onedriveInfoId
   when (onedriveInfo.token /= Just onedriveToken) $ DB.putJson db $ OnedriveInfo $ onedriveInfo { token = Just onedriveToken }
+
+
+updateUserInfoInDbIfNeeded :: forall e. DB.PouchDB -> UserInfo -> DB.PouchDBAff e Unit
+updateUserInfoInDbIfNeeded db (UserInfo info) = do
+  maybeUserInfo <- DB.tryGetJson db U.userInfoId
+  case maybeUserInfo of
+    Nothing -> do
+      let
+        newUserInfo =
+          U.UserInfo
+          { _id : U.userInfoId
+          , _rev : ""
+          , displayName : info.displayName
+          }
+      DB.putJson db newUserInfo
+    Just (U.UserInfo userInfo) ->
+      when (userInfo.displayName /= info.displayName) $ do
+        let
+          newUserInfo =
+            U.UserInfo userInfo
+            { displayName = info.displayName
+            }
+        DB.putJson db newUserInfo
 
 
 renderMain :: forall e. String -> String -> DB.PouchDB -> Eff (dom :: DOM, pouchdb :: DB.POUCHDB, ajax :: AJAX | e) Unit

@@ -12,9 +12,7 @@ import qualified Data.Text as T
 data UserInfo =
   UserInfo
   { __id :: T.Text
-  , _name :: T.Text
-  , _firstName :: Maybe T.Text
-  , _lastName :: Maybe T.Text
+  , _displayName :: T.Text
   } deriving (Eq, Show)
 
 
@@ -23,19 +21,9 @@ _id =
   lens __id (\u x -> u { __id = x })
 
 
-name :: Lens' UserInfo T.Text
-name =
-  lens _name (\u x -> u { _name = x })
-
-
-firstName :: Lens' UserInfo (Maybe T.Text)
-firstName =
-  lens _firstName (\u x -> u { _firstName = x })
-
-
-lastName :: Lens' UserInfo (Maybe T.Text)
-lastName =
-  lens _lastName (\u x -> u { _lastName = x })
+displayName :: Lens' UserInfo T.Text
+displayName =
+  lens _displayName (\u x -> u { _displayName = x })
 
 
 instance FromJSON UserInfo where
@@ -43,8 +31,6 @@ instance FromJSON UserInfo where
     UserInfo
     <$> o .: "id"
     <*> o .: "name"
-    <*> o .:? "first_name"
-    <*> o .:? "last_name"
 
   parseJSON invalid =
     typeMismatch "UserInfo" invalid
