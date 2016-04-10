@@ -1,23 +1,39 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Onedrive where
 
-import Control.Lens
-import Control.Monad.Catch
-import Control.Monad.IO.Class
-import Control.Monad.Reader.Class
-import Data.Aeson
-import Data.Aeson.Lens
-import Data.Aeson.Types
+
+import Control.Lens ((^.))
+import Control.Monad.Catch (MonadThrow)
+import Control.Monad.IO.Class (MonadIO)
+import Control.Monad.Reader.Class (MonadReader)
+import Data.Aeson (json')
+import Data.Aeson.Lens (key, _String)
+import Data.Aeson.Types (FromJSON,
+                         parseJSON,
+                         Value(String, Object),
+                         typeMismatch,
+                         (.:),
+                         (.:?),
+                         fromJSON,
+                         Result(Success, Error))
 import qualified Data.Attoparsec.ByteString as A
 import qualified Data.ByteString as B
-import Data.Conduit
-import Data.Conduit.Attoparsec
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
-import Network.HTTP.Client.Conduit
-import Network.HTTP.Types.Header
-import Network.HTTP.Types.URI
-import UserInfo
+import Data.Conduit (($$))
+import Data.Conduit.Attoparsec (sinkParser)
+import qualified Data.Text as T (Text)
+import qualified Data.Text.Encoding as T (encodeUtf8)
+import Network.HTTP.Client.Conduit (HasHttpManager
+                                   , parseUrl
+                                   , method
+                                   , requestBody
+                                   , RequestBody (RequestBodyBS)
+                                   , requestHeaders
+                                   , responseBody
+                                   , responseOpen
+                                   , queryString)
+import Network.HTTP.Types.Header (hContentType)
+import Network.HTTP.Types.URI (renderQuery)
+import UserInfo (UserInfo, userInfoParser)
 
 
 data OauthTokenRequest =

@@ -1,29 +1,53 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+module Main (main) where
 
-import Control.Lens
-import Control.Monad.Catch
-import Control.Monad.Trans.Class
-import Data.Aeson
-import Data.Maybe
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
+
+import Control.Error.Util (hoistMaybe, maybeT)
+import Control.Lens ((^.))
+import Control.Monad.Catch (catch, throwM)
+import Control.Monad.Trans.Class (lift)
+import Data.Aeson (toJSON)
+import Data.Maybe (fromJust)
+import qualified Data.Text as T (Text, concat)
+import qualified Data.Text.Encoding as T (decodeUtf8)
 import qualified Data.Text.Lazy as TL
 import qualified  Network.HTTP.Client.Conduit as C
-import Network.Wai
+import Network.HTTP.Conduit (HttpException(StatusCodeException))
+import Network.HTTP.Types.Status (unauthorized401)
+import Network.Wai (queryString)
 import qualified Network.Wai.Middleware.Static as Wai
-import qualified Text.Blaze as H
-import qualified Text.Blaze.Html.Renderer.Text as H
-import qualified Text.Blaze.Html5 as H
+import Onedrive (OauthTokenRequest(..), oauthTokenRequest, me, OauthTokenResponse(..))
+import ReactRender (render)
+import qualified Text.Blaze.Html.Renderer.Text as H (renderHtml)
+import qualified Text.Blaze.Html5 as H (Html,
+                                        textComment,
+                                        docTypeHtml,
+                                        head,
+                                        meta,
+                                        title,
+                                        (!),
+                                        link,
+                                        body,
+                                        p,
+                                        text,
+                                        strong,
+                                        a,
+                                        script,
+                                        div,
+                                        toValue)
 import qualified Text.Blaze.Html5.Attributes as HA
-import Web.Spock
-
-import Onedrive
-import ReactRender
-import UserInfo
-
-
-instance (MonadThrow m) => MonadThrow (ActionCtxT ctx m) where
-  throwM e = lift $ throwM e
+import UserInfo (name)
+import Web.Spock (runSpock,
+                  spockT,
+                  get,
+                  cookie,
+                  middleware,
+                  redirect,
+                  html,
+                  request,
+                  setCookie,
+                  defaultCookieSettings)
 
 
 ie10comment :: H.Html -> H.Html
@@ -76,16 +100,12 @@ main :: IO ()
 main = runSpock 8000 $ spockT id $ do
   middleware Wai.static
   
-  get "/" $ do
-    onedriveTokenCookie <- cookie "onedriveToken"
-    case onedriveTokenCookie of
-      Just token -> do
-        meUser <- C.withManager $ me token
-        rendered <- render "public/js/index.server.bundle.js" [toJSON $ meUser ^. name, toJSON token]
-        html $ renderHtml $ indexPage rendered
-      _ ->
-        redirect "/login"
-        
+  get "/" $ maybeT (redirect "/login") return $ do
+    onedriveTokenCookie <- hoistMaybeM $ cookie "onedriveToken"
+    meUser <- hoistMaybeM $ lift $ catchUnauthorizedException $ C.withManager $ me onedriveTokenCookie
+    rendered <- lift $ render "public/js/index.server.bundle.js" [toJSON $ meUser ^. name, toJSON onedriveTokenCookie]
+    lift $ html $ renderHtml $ indexPage rendered
+
   get "login" $ do
     rendered <- render "public/js/login.server.bundle.js" []
     html $ renderHtml $ loginPage rendered
@@ -100,7 +120,7 @@ main = runSpock 8000 $ spockT id $ do
           , clientSecret = onedriveClientSecret
           , code = T.decodeUtf8 $ fromJust c
           }
-    tokenResp <- C.withManager $ oauthTokenRequest req
+    tokenResp <- lift $ C.withManager $ oauthTokenRequest req
     setCookie "onedriveToken" (accessToken tokenResp) defaultCookieSettings
     redirect "/"
 
@@ -109,3 +129,16 @@ main = runSpock 8000 $ spockT id $ do
     pa par ((p, v) : qs)
       | p == par = v
       | otherwise = pa par qs
+
+    hoistMaybeM r =
+      lift r >>= hoistMaybe
+
+    catchUnauthorizedException r =
+      fmap Just r `catch` processUnauthorizedException
+
+    processUnauthorizedException e@(StatusCodeException s _ _) =
+      if s == unauthorized401
+      then return Nothing
+      else throwM e
+    processUnauthorizedException e =
+      throwM e

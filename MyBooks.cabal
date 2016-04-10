@@ -37,6 +37,13 @@ executable MyBooks
                        hs-duktape,
                        lens-aeson,
                        lens,
-                       blaze-markup
+                       blaze-markup,
+                       errors
   hs-source-dirs:      server
   default-language:    Haskell2010
+
+executable BookIndexer
+           main-is: Main.hs
+           build-depends:       base
+           hs-source-dirs:      server/BookIndexer
+           default-language:    Haskell2010
