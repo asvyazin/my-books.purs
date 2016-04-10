@@ -1,11 +1,11 @@
 module Libs.PouchDB where
 
 
-import Control.Monad.Aff
-import Control.Monad.Eff
-import Control.Monad.Eff.Exception
-import Data.Foreign
-import Data.Maybe
+import Control.Monad.Aff (Aff, makeAff)
+import Control.Monad.Eff (Eff)
+import Control.Monad.Eff.Exception (Error)
+import Data.Foreign (Foreign, unsafeFromForeign, isNull)
+import Data.Maybe (Maybe(..))
 import Prelude
 
 

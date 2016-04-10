@@ -2,11 +2,10 @@ module Common.OneDriveApi where
 
 
 import Common.Json ((.??))
-import Control.Error.Util (note)
 import Control.Monad.Aff (Aff)
 import Control.Monad.Eff.Exception (Error, error)
 import Control.Monad.Error.Class (class MonadError, throwError)
-import Data.Argonaut.Combinators ((.?))
+import Data.Argonaut.Combinators ((.?), (?>>=))
 import Data.Argonaut.Core (toArray, toObject)
 import Data.Argonaut.Decode (class DecodeJson, decodeJson)
 import Data.Argonaut.Parser (jsonParser)
@@ -39,7 +38,7 @@ instance showUserInfo :: Show UserInfo where
 
 instance decodeJsonUserInfo :: DecodeJson UserInfo where
   decodeJson json = do
-    o <- note "Expected object" $ toObject json
+    o <- toObject json ?>>= "Expected object"
     id <- o .? "id"
     name <- o .? "name"
     firstName <- o .?? "first_name"
@@ -103,21 +102,21 @@ derive instance genericOneDriveItems :: Generic OneDriveItems
 
 instance decodeJsonOneDriveFolderFacet :: DecodeJson OneDriveFolderFacet where
   decodeJson json = do
-    o <- note "Expected object" $ toObject json
+    o <- toObject json ?>>= "Expected object"
     childCount <- o .? "childCount"
     return $ OneDriveFolderFacet { childCount }
 
 
 instance decodeJsonOneDriveFileFacet :: DecodeJson OneDriveFileFacet where
   decodeJson json = do
-    o <- note "Expected object" $ toObject json
+    o <- toObject json ?>>= "Expected object"
     mimeType <- o .? "mimeType"
     return $ OneDriveFileFacet { mimeType }
 
 
 instance decodeJsonOneDriveItemReference :: DecodeJson ItemReference where
   decodeJson json = do
-    o <- note "Expected object" $ toObject json
+    o <- toObject json ?>>= "Expected object"
     driveId <- o .? "driveId"
     id <- o .? "id"
     path <- o .? "path"
@@ -126,7 +125,7 @@ instance decodeJsonOneDriveItemReference :: DecodeJson ItemReference where
 
 instance decodeJsonOneDriveItem :: DecodeJson OneDriveItem where
   decodeJson json = do
-    o <- note "Expected object" $ toObject json
+    o <- toObject json ?>>= "Expected object"
     id <- o .? "id"
     name <- o .? "name"
     folder <- o .?? "folder"
@@ -137,9 +136,9 @@ instance decodeJsonOneDriveItem :: DecodeJson OneDriveItem where
 
 instance decodeJsonOneDriveItems :: DecodeJson OneDriveItems where
   decodeJson json = do
-    o <- note "Expected object" $ toObject json
-    jValue <- note "Expected 'value'" $ M.lookup "value" o
-    jArr <- note "Expected array" $ toArray jValue
+    o <- toObject json ?>>= "Expected object"
+    jValue <- M.lookup "value" o ?>>= "Expected 'value'"
+    jArr <- toArray jValue ?>>= "Expected array"
     value <- traverse decodeJson jArr
     return $ OneDriveItems { value }
 

@@ -1,21 +1,17 @@
 module Common.Settings where
 
 
-import Control.Error.Util
-import Control.Monad.Eff.Exception
-import Data.Argonaut.Combinators
-import Data.Argonaut.Core
-import Data.Argonaut.Decode
-import Data.Argonaut.Encode
-import Data.Bifunctor
-import Data.List
-import Data.Maybe
-import qualified Data.StrMap as S
-import qualified Libs.PouchDB as DB
+import Common.Json ((.??))
+import Data.Argonaut.Combinators ((?>>=), (.?), (:=))
+import Data.Argonaut.Core (fromObject, toObject)
+import Data.Argonaut.Decode (class DecodeJson)
+import Data.Argonaut.Encode (class EncodeJson)
+import Data.List (toList)
+import Data.Maybe (Maybe(..), fromMaybe)
+import Data.StrMap as S
+import Libs.PouchDB (PouchDB, PouchDBAff) as DB
+import Libs.PouchDB.Json (getJson, tryGetJson, putJson) as DB
 import Prelude
-
-import Common.Json
-import Common.Monad
 
 
 newtype Settings =
@@ -28,7 +24,7 @@ newtype Settings =
 
 instance decodeJsonSettings :: DecodeJson Settings where
   decodeJson o = do
-    jObj <- note "Expected object" $ toObject o
+    jObj <- toObject o ?>>= "Expected object"
     _id <- jObj .? "_id"
     _rev <- jObj .?? "_rev"
     booksDirectory <- jObj .?? "booksDirectory"
@@ -49,20 +45,13 @@ settingsId = "settings"
 
 
 getSettings :: forall e. DB.PouchDB -> DB.PouchDBAff e Settings
-getSettings db = do
-  json <- DB.get db settingsId
-  guardEither $ lmap error $ decodeJson json
+getSettings db =
+  DB.getJson db settingsId
 
 
 tryGetSettings :: forall e. DB.PouchDB -> DB.PouchDBAff e (Maybe Settings)
-tryGetSettings db = do
-  json <- DB.tryGet db settingsId
-  case json of
-    Nothing ->
-      return Nothing
-    Just j -> do
-      result <- guardEither $ lmap error $ decodeJson j
-      return $ Just result
+tryGetSettings db =
+  DB.tryGetJson db settingsId
 
 
 newSettings :: Settings
@@ -74,12 +63,12 @@ newSettings =
   }
 
 
-updateSettings :: forall e. DB.PouchDB -> (Settings -> Settings) -> DB.PouchDBAff e DB.PutResponse
+updateSettings :: forall e. DB.PouchDB -> (Settings -> Settings) -> DB.PouchDBAff e Unit
 updateSettings db update = do
   settings <- fromMaybe newSettings <$> tryGetSettings db
   setSettings db $ update settings
 
 
-setSettings :: forall e. DB.PouchDB -> Settings -> DB.PouchDBAff e DB.PutResponse
+setSettings :: forall e. DB.PouchDB -> Settings -> DB.PouchDBAff e Unit
 setSettings db settings =
-  DB.put db $ encodeJson settings
+  DB.putJson db settings
