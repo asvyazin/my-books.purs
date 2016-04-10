@@ -16,9 +16,10 @@ import DOM.HTML.Types (htmlDocumentToParentNode)
 import DOM.HTML.Window (document)
 import DOM.Node.ParentNode (querySelector)
 import Entries.Index.Class (component)
+import Global (encodeURIComponent)
 import Libs.PouchDB as DB
 import Network.HTTP.Affjax (AJAX)
-import Prelude (Unit, void, ($), (<<<), (<$>), bind, (>>=))
+import Prelude
 import React (createFactory) as R
 import ReactDOM (render) as R
 import Web.Cookies (COOKIE, getCookie)
@@ -28,16 +29,19 @@ main :: Eff (cookie :: COOKIE, ajax :: AJAX, dom :: DOM, err :: EXCEPTION, pouch
 main = launchAff $ do
   onedriveToken <-
     liftEff (getCookie "onedriveToken") >>= guardMaybe (error "OneDrive token expected")
-  let getName (UserInfo userInfo) =
-        userInfo.name
-  user <- getName <$> getUserInfo onedriveToken
-  liftEff' (renderMain user onedriveToken) >>= guardEither
-    
+  UserInfo userInfo <- getUserInfo onedriveToken
+  let
+    dbName =
+      encodeURIComponent $ "my-books/" ++ userInfo.id
+    remoteDb =
+      "http://localhost:5984/" ++ dbName
+  localDb <- liftEff $ DB.newPouchDB dbName
+  void $ liftEff $ DB.sync localDb remoteDb { live: true, retry: true }
+  liftEff' (renderMain userInfo.name onedriveToken localDb) >>= guardEither
 
-renderMain :: forall e. String -> String -> Eff (dom :: DOM, pouchdb :: DB.POUCHDB, ajax :: AJAX | e) Unit
-renderMain user onedriveToken = do
-    db <- DB.newPouchDB "my-books"
-    void $ DB.sync db "http://localhost:5984/my-books" { live: true, retry: true }
+
+renderMain :: forall e. String -> String -> DB.PouchDB -> Eff (dom :: DOM, pouchdb :: DB.POUCHDB, ajax :: AJAX | e) Unit
+renderMain user onedriveToken db = do
     node <- htmlDocumentToParentNode <$> (window >>= document)
     container <- (fromJust <<< toMaybe) <$> querySelector ".application" node
     let

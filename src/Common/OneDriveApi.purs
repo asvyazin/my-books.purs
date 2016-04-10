@@ -1,25 +1,24 @@
 module Common.OneDriveApi where
 
 
-import Control.Error.Util
-import Control.Monad.Aff
-import Control.Monad.Eff.Exception
-import Control.Monad.Error.Class
-import Data.Argonaut.Combinators
-import Data.Argonaut.Core
-import Data.Argonaut.Decode
-import Data.Argonaut.Parser
-import Data.Either
-import Data.Generic
-import Data.Maybe
-import qualified Data.StrMap as M
-import Data.Traversable
-import Network.HTTP.Affjax
-import Network.HTTP.Method
-import Network.HTTP.RequestHeader
+import Common.Json ((.??))
+import Control.Error.Util (note)
+import Control.Monad.Aff (Aff)
+import Control.Monad.Eff.Exception (Error, error)
+import Control.Monad.Error.Class (class MonadError, throwError)
+import Data.Argonaut.Combinators ((.?))
+import Data.Argonaut.Core (toArray, toObject)
+import Data.Argonaut.Decode (class DecodeJson, decodeJson)
+import Data.Argonaut.Parser (jsonParser)
+import Data.Either (either)
+import Data.Generic (class Generic, gShow)
+import Data.Maybe (Maybe, maybe)
+import Data.StrMap as M
+import Data.Traversable (traverse)
+import Network.HTTP.Affjax (AJAX, AffjaxRequest, AffjaxResponse, get, defaultRequest, affjax)
+import Network.HTTP.Method (Method(GET))
+import Network.HTTP.RequestHeader (RequestHeader(RequestHeader))
 import Prelude
-
-import Common.Json
 
 
 newtype UserInfo =
@@ -176,7 +175,7 @@ getOneDriveItem :: forall e. String -> Maybe String -> Aff (ajax :: AJAX | e) On
 getOneDriveItem token itemId = do
   let
     url =
-      maybe "/drive/root" ("/drive/items/" ++) itemId
+      maybe "/drive/root" ("/drive/items/" ++ _) itemId
     req =
       onedriveGetRequest token url
   doJsonRequest req
