@@ -1,35 +1,35 @@
 module Components.BooksDirectory (booksDirectory) where
 
 
+import Common.Data.BooksDirectoryInfo (BooksDirectoryInfo(BooksDirectoryInfo), booksDirectoryInfoId)
 import Common.Monad (guardEither)
 import Common.OneDriveApi (ItemReference(..), OneDriveItem(..), getOneDriveItem)
 import Common.React (maybeProps, mapProps, mapPropsWithState)
-import Common.Settings (Settings(..), tryGetSettings)
 import Components.AjaxLoader as AjaxLoader
 import Components.ChoosedDirectory as ChoosedDirectory
 import Components.ChooseDirectoryModal as ChooseDirectoryModal
 import Components.OneDriveFileTree as FileTree
+import Components.Wrappers.Button as Button
+import Components.Wrappers.Glyphicon as Glyphicon
 import Control.Monad.Aff (Aff, launchAff, liftEff')
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Exception (EXCEPTION)
 import Control.Monad.Maybe.Trans (runMaybeT)
 import Control.Monad.Trans (lift)
-import Control.Error.Util
+import Control.Error.Util (hoistMaybe)
 import Data.Foldable (fold)
 import Data.Lens (LensP, over, lens)
 import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.String as S
 import Data.Tuple (Tuple(..))
+import Libs.PouchDB (POUCHDB, PouchDB) as DB
+import Libs.PouchDB.Json (tryGetJson) as DB
 import Network.HTTP.Affjax (AJAX)
-import Prelude ((++), return, (<$>), bind, (+), ($), void, not, unit, pure, (>>=))
+import Prelude
 import React (ReactElement, ReactClass, createElement, createClass, transformState, getProps) as R
 import React.DOM (text, div) as R
 import React.DOM.Props as RP
 import Thermite as T
-
-import Components.Wrappers.Button as Button
-import Components.Wrappers.Glyphicon as Glyphicon
-import Libs.PouchDB as DB
 
 
 type Props =
@@ -160,17 +160,11 @@ reactClass =
 
     componentDidMount this = launchAff $ do
       props <- liftEff $ R.getProps this
-      void $ runMaybeT $ do
+      dir <- runMaybeT $ do
         db <- hoistMaybe props.db
-        maybeSettings <- lift $ tryGetSettings db
-        case maybeSettings of
-          Nothing ->
-            liftEff $ R.transformState this (_ { directory = Nothing, stateLoaded = true })
-          Just settings -> do
-            dir <- lift $ getDirectoryInfo props.onedriveToken $ getBooksDirectory settings
-            liftEff $ R.transformState this (_ { directory = Just dir, stateLoaded = true })
-      where
-        getBooksDirectory (Settings s) = s.booksDirectory
+        BooksDirectoryInfo info <- lift (DB.tryGetJson db booksDirectoryInfoId) >>= hoistMaybe
+        lift $ getDirectoryInfo props.onedriveToken info.booksItemId
+      liftEff $ R.transformState this (_ { directory = dir, stateLoaded = true })
 
 
 booksDirectory :: Props -> R.ReactElement

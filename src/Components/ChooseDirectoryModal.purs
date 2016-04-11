@@ -1,23 +1,25 @@
 module Components.ChooseDirectoryModal where
 
 
-import Common.Monad
-import Common.React
-import Common.Settings
-import qualified Components.OneDriveFileTree as FileTree
-import qualified Components.Wrappers.Button as Button
-import qualified Components.Wrappers.Modal as Modal
-import Control.Monad.Aff
-import Control.Monad.Eff.Exception
-import Data.Foldable
-import Data.Lens
-import Data.Maybe
-import Data.Tuple
-import qualified Libs.PouchDB as DB
+import Common.Data.BooksDirectoryInfo (BooksDirectoryInfo(BooksDirectoryInfo), booksDirectoryInfoId, defaultBooksDirectoryInfo)
+import Common.Monad (guardEither)
+import Common.React (mapProps)
+import Components.OneDriveFileTree as FileTree
+import Components.Wrappers.Button as Button
+import Components.Wrappers.Modal as Modal
+import Control.Monad (when)
+import Control.Monad.Aff (launchAff, liftEff')
+import Control.Monad.Eff.Exception (EXCEPTION)
+import Data.Foldable (fold)
+import Data.Lens (PrismP, LensP, lens, prism', over)
+import Data.Maybe (Maybe(Nothing, Just), fromMaybe)
+import Data.Tuple (Tuple(Tuple))
+import Libs.PouchDB (POUCHDB, PouchDB, PouchDBAff) as DB
+import Libs.PouchDB.Json (putJson, tryGetJson) as DB
 import Network.HTTP.Affjax (AJAX())
 import Prelude
-import qualified React.DOM as R
-import qualified Thermite as T
+import React.DOM as R
+import Thermite as T
 
 
 type Props =
@@ -97,7 +99,7 @@ spec =
       case FileTree.unwrapChildAction action of
         Tuple itemId FileTree.SelectDirectory ->
           launchAff $ do
-            void $ updateSettings props.db (\(Settings s) -> Settings (s { booksDirectory = itemId }))
+            updateBooksDirectoryIfNeeded props.db itemId
             (liftEff' $ update $ \x -> x { show = false }) >>= guardEither
         _ ->
           pure unit
@@ -107,3 +109,10 @@ spec =
 
     performAction HideModal _ state update =
       update $ \x -> x { show = false }
+
+
+updateBooksDirectoryIfNeeded :: forall e. DB.PouchDB -> Maybe String -> DB.PouchDBAff e Unit
+updateBooksDirectoryIfNeeded db itemId = do
+  BooksDirectoryInfo current <- fromMaybe defaultBooksDirectoryInfo <$> DB.tryGetJson db booksDirectoryInfoId
+  when (current.booksItemId /= itemId) $
+    DB.putJson db $ BooksDirectoryInfo current { booksItemId = itemId }
