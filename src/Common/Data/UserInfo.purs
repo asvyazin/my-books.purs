@@ -1,10 +1,12 @@
 module Common.Data.UserInfo where
 
 
-import Data.Argonaut.Core (toObject, jsonEmptyObject)
-import Data.Argonaut.Combinators ((:=), (~>), (?>>=), (.?))
+import Data.Argonaut.Core (toObject, fromObject)
+import Data.Argonaut.Combinators ((:=), (?>>=), (.?))
 import Data.Argonaut.Decode (class DecodeJson)
 import Data.Argonaut.Encode (class EncodeJson)
+import Data.List (toList)
+import Data.StrMap (fromList) as S
 import Prelude
 
 
@@ -27,7 +29,11 @@ instance decodeJsonUserInfo :: DecodeJson UserInfo where
 
 instance encodeJsonUserInfo :: EncodeJson UserInfo where
   encodeJson (UserInfo info) =
-    ("_id" := info._id) ~> ("_rev" := info._rev) ~> ("displayName" := info.displayName) ~> jsonEmptyObject
+    fromObject $ S.fromList $ toList
+    [ "_id" := info._id
+    , "_rev" := info._rev
+    , "displayName" := info.displayName
+    ]
 
 
 userInfoId :: String
