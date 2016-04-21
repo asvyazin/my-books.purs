@@ -5,6 +5,7 @@ module Main (main) where
 import Control.Error.Util (hoistMaybe, maybeT)
 import Control.Lens ((^.))
 import Control.Monad.Catch (catch, throwM)
+import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Class (lift)
 import Data.Aeson (toJSON)
 import Data.Maybe (fromJust)
@@ -18,7 +19,9 @@ import Network.Wai (queryString)
 import qualified Network.Wai.Middleware.Static as Wai
 import Onedrive (OauthTokenRequest(..), oauthTokenRequest, me, OauthTokenResponse(..))
 import ReactRender (render)
-import System.Environment (lookupEnv)
+import System.Directory (getCurrentDirectory)
+import System.Environment (lookupEnv, getExecutablePath)
+import System.FilePath ((</>))
 import qualified Text.Blaze.Html.Renderer.Text as H (renderHtml)
 import qualified Text.Blaze.Html5 as H (Html,
                                         textComment,
@@ -60,8 +63,8 @@ withMaster mainScript childrenMarkup = H.docTypeHtml $ do
   H.head $ do
     H.meta H.! HA.charset "UTF-8"
     H.title "My Books"
-    H.link H.! HA.rel "stylesheet" H.! HA.type_ "text/css" H.! HA.href "/bower_components/bootstrap-theme-bootswatch-flatly/css/bootstrap.min.css"
-    H.link H.! HA.rel "stylesheet" H.! HA.type_ "text/css" H.! HA.href "/node_modules/react-treeview/react-treeview.css"
+    H.link H.! HA.rel "stylesheet" H.! HA.type_ "text/css" H.! HA.href "/bootstrap/css/bootstrap.min.css"
+    H.link H.! HA.rel "stylesheet" H.! HA.type_ "text/css" H.! HA.href "/react-treeview/css/react-treeview.css"
   H.body $ do
     ie10comment $ H.p H.! HA.class_ "browserupgrade" $ do
       H.text "You are using an "
@@ -75,12 +78,12 @@ withMaster mainScript childrenMarkup = H.docTypeHtml $ do
 
 indexPage :: H.Html -> H.Html
 indexPage rendered =
-  withMaster "/public/js/index.bundle.js" $ H.div H.! HA.class_ "application" $ rendered
+  withMaster "/js/index.bundle.js" $ H.div H.! HA.class_ "application" $ rendered
 
 
 loginPage :: H.Html -> H.Html
 loginPage rendered =
-  withMaster "/public/js/login.bundle.js" $ H.div H.! HA.class_ "application" $ rendered
+  withMaster "/js/login.bundle.js" $ H.div H.! HA.class_ "application" $ rendered
 
 
 renderHtml :: H.Html -> T.Text
@@ -110,7 +113,20 @@ main :: IO ()
 main = do
   port <- getPort
   runSpock port $ spockT id $ do
-    middleware Wai.static
+    currentDirectory <- liftIO $ getCurrentDirectory
+    let policy =
+          Wai.only [ ("bootstrap/css/bootstrap.min.css", currentDirectory </> "bower_components" </> "bootstrap-theme-bootswatch-flatly" </> "css" </> "bootstrap.min.css")
+                   , ("bootstrap/fonts/glyphicons-halflings-regular.eot", currentDirectory </> "bower_components" </> "bootstrap" </> "dist" </> "fonts" </> "glyphicons-halflings-regular.eot")
+                   , ("bootstrap/fonts/glyphicons-halflings-regular.svg", currentDirectory </> "bower_components" </> "bootstrap" </> "dist" </> "fonts" </> "glyphicons-halflings-regular.svg")
+                   , ("bootstrap/fonts/glyphicons-halflings-regular.ttf", currentDirectory </> "bower_components" </> "bootstrap" </> "dist" </> "fonts" </> "glyphicons-halflings-regular.ttf")
+                   , ("bootstrap/fonts/glyphicons-halflings-regular.woff", currentDirectory </> "bower_components" </> "bootstrap" </> "dist" </> "fonts" </> "glyphicons-halflings-regular.woff")
+                   , ("bootstrap/fonts/glyphicons-halflings-regular.woff2", currentDirectory </> "bower_components" </> "bootstrap" </> "dist" </> "fonts" </> "glyphicons-halflings-regular.woff2")
+                   , ("react-treeview/css/react-treeview.css", currentDirectory </> "node_modules" </> "react-treeview" </> "react-treeview.css")
+                   , ("js/login.bundle.js", currentDirectory </> "public" </> "js" </> "login.bundle.js")
+                   , ("js/index.bundle.js", currentDirectory </> "public" </> "js" </> "index.bundle.js")
+                   , ("images/ajax-loader.gif", currentDirectory </> "images" </> "ajax-loader.gif")
+                   ]
+    middleware $ Wai.staticPolicy policy
   
     get "/" $ maybeT (redirect "/login") return $ do
       onedriveTokenCookie <- hoistMaybeM $ cookie "onedriveToken"

@@ -38,7 +38,9 @@ executable MyBooks
                        lens-aeson,
                        lens,
                        blaze-markup,
-                       errors
+                       errors,
+                       directory,
+                       filepath
   hs-source-dirs:      server
   default-language:    Haskell2010
 
