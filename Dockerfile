@@ -1,14 +1,12 @@
-FROM fpco/stack-build:lts-5.11
+FROM fpco/stack-build:lts-5.13
 
 ENV PATH=$PATH:$HOME/.local/bin
-
-RUN stack install purescript --resolver nightly
 
 WORKDIR /src
 
 COPY . .
 
-RUN npm install && npm run bower install -- --allow-root && npm run webpack
+RUN npm install
 
 RUN stack build
 
