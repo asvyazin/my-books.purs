@@ -1,30 +1,30 @@
 module Components.OneDriveFileTree where
 
 
-import Common.Monad
-import Common.OneDriveApi
-import Common.React
-import qualified Components.AjaxLoader as AjaxLoader
-import qualified Components.Wrappers.Alert as Alert
-import qualified Components.Wrappers.Glyphicon as Glyphicon
-import qualified Components.Wrappers.TreeView as TreeView
-import Control.Error.Util
-import Control.Monad
-import Control.Monad.Aff
-import Control.Monad.Eff.Exception
-import Control.Monad.Maybe.Trans
-import Data.Array
-import Data.Foldable
-import Data.Lens
-import Data.Maybe
-import Data.Monoid
-import Data.Tuple
+import Common.Monad (guardEither)
+import Common.OneDriveApi (OneDriveItem(OneDriveItem), getChildrenByItemId)
+import Common.React (mapPropsWithState)
+import Components.AjaxLoader as AjaxLoader
+import Components.Wrappers.Alert as Alert
+import Components.Wrappers.Glyphicon as Glyphicon
+import Components.Wrappers.TreeView as TreeView
+import Control.Error.Util (hoistMaybe)
+import Control.Monad (when)
+import Control.Monad.Aff (launchAff, liftEff')
+import Control.Monad.Eff.Exception (EXCEPTION)
+import Control.Monad.Maybe.Trans (lift, runMaybeT)
+import Data.Array (zip, (!!), findIndex, updateAt, filter, zipWith)
+import Data.Foldable (foldl, fold)
+import Data.Lens (PrismP, LensP, view, over, prism', _2, set, lens)
+import Data.Maybe (Maybe(Nothing, Just), fromMaybe, isJust)
+import Data.Monoid (mempty)
+import Data.Tuple (Tuple(Tuple), fst)
 import Network.HTTP.Affjax (AJAX())
 import Prelude
-import qualified React as R
-import qualified React.DOM as R
-import qualified React.DOM.Props as RP
-import qualified Thermite as T
+import React (ReactElement, createElement) as R
+import React.DOM (text, span) as R
+import React.DOM.Props as RP
+import Thermite as T
 
 
 type Props =
