@@ -2,9 +2,9 @@
 module UserInfo where
 
 
-import Control.Lens
-import Data.Aeson
-import Data.Aeson.Types
+import Control.Lens (Lens', lens)
+import Data.Aeson (json', (.:))
+import Data.Aeson.Types (FromJSON(parseJSON), Value(Object), fromJSON, typeMismatch, Result(Success, Error))
 import qualified Data.Attoparsec.ByteString as A
 import qualified Data.Text as T
 

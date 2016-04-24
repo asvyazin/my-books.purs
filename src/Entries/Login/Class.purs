@@ -1,25 +1,25 @@
 module Entries.Login.Class where
 
-import Common.React
-import Data.List
-import Data.Maybe
+import Common.React (mapProps)
+import Components.Header as Header
+import Components.Wrappers.Button as Button
+import Components.Wrappers.Glyphicon as Glyphicon
+import Data.List (List(..), fromList, toList)
+import Data.Maybe (Maybe(Nothing))
 import Data.String (joinWith)
-import Data.Tuple
+import Data.Tuple (Tuple(Tuple))
 import Global (encodeURIComponent)
 import Prelude
-import qualified React as R
-import qualified React.DOM as R
-import qualified React.DOM.Props as RP
-import qualified Thermite as T
-
-import qualified Components.Header as Header
-import qualified Components.Wrappers.Button as Button
-import qualified Components.Wrappers.Glyphicon as Glyphicon
+import React (ReactClass) as R
+import React.DOM (text, div) as R
+import React.DOM.Props as RP
+import Thermite as T
 
 
 type Props =
   { clientId :: String
   , scope :: String
+  , appBaseUrl :: String
   }
 
 
@@ -44,7 +44,7 @@ loginButton =
       [ (Tuple "client_id" props.clientId)
       , (Tuple "scope" props.scope)
       , (Tuple "response_type" "code")
-      , (Tuple "redirect_uri" "http://localhost:8000/onedrive-redirect")
+      , (Tuple "redirect_uri" (props.appBaseUrl <> "/onedrive-redirect"))
       ]
 
     loginUrl =

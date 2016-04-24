@@ -8,9 +8,9 @@ import Control.Monad.Catch (catch, throwM)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Class (lift)
 import Data.Aeson (toJSON)
-import Data.Maybe (fromJust)
+import Data.Maybe (fromJust, maybe)
 import Data.Monoid ((<>))
-import qualified Data.Text as T (Text, concat)
+import qualified Data.Text as T (Text, concat, pack)
 import qualified Data.Text.Encoding as T (decodeUtf8)
 import qualified Data.Text.Lazy as TL
 import qualified  Network.HTTP.Client.Conduit as C
@@ -21,6 +21,7 @@ import qualified Network.Wai.Middleware.Static as Wai
 import Onedrive (OauthTokenRequest(..), oauthTokenRequest, me, OauthTokenResponse(..))
 import Options.Applicative (Parser, switch, long, help, execParser, info, helper, fullDesc)
 import ReactRender (render)
+import ServerEnvironmentInfo (ServerEnvironmentInfo(..))
 import System.Directory (getCurrentDirectory)
 import System.Environment (lookupEnv, getExecutablePath)
 import System.FilePath ((</>))
@@ -52,7 +53,8 @@ import Web.Spock (runSpock,
                   html,
                   request,
                   setCookie,
-                  defaultCookieSettings)
+                  defaultCookieSettings,
+                  json)
 
 
 ie10comment :: H.Html -> H.Html
@@ -93,27 +95,12 @@ renderHtml =
   TL.toStrict . H.renderHtml
 
 
-onedriveClientId :: T.Text
-onedriveClientId = "000000004816D42C"
-
-
-onedriveClientSecret :: T.Text
-onedriveClientSecret = "-4tKnVPaAyIEAgYrBp8R6jTYY0zClN6c"
-
-
-getPort :: IO Int
-getPort = do
-  maybePortStr <- lookupEnv "PORT"
-  case maybePortStr of
-    Just portStr ->
-      return $ read portStr
-    Nothing ->
-      return 8000
-
-
 main :: IO ()
 main = do
   port <- getPort
+  onedriveClientId <- getOnedriveClientId
+  onedriveClientSecret <- getOnedriveClientSecret
+  appBaseUrl <- getAppBaseUrl
   opts <- execParser $ info (helper <*> options) fullDesc
   runSpock port $ spockT id $ do
     currentDirectory <- liftIO $ getCurrentDirectory
@@ -146,7 +133,7 @@ main = do
       rendered <-
         if serverSideRendering opts
         then
-          render "public/js/login.server.bundle.js" []
+          render "public/js/login.server.bundle.js" [toJSON appBaseUrl, toJSON onedriveClientId]
         else
           return ""
       html $ renderHtml $ loginPage rendered
@@ -157,13 +144,16 @@ main = do
       let req =
             OauthTokenRequest
             { clientId = onedriveClientId
-            , redirectUri = "http://localhost:8000/onedrive-redirect"
+            , redirectUri = appBaseUrl <> "/onedrive-redirect"
             , clientSecret = onedriveClientSecret
             , code = T.decodeUtf8 $ fromJust c
             }
       tokenResp <- lift $ C.withManager $ oauthTokenRequest req
       setCookie "onedriveToken" (accessToken tokenResp) defaultCookieSettings
       redirect "/"
+
+    get "server-environment" $
+      json $ ServerEnvironmentInfo appBaseUrl onedriveClientId
 
   where
     pa _ [] = Nothing
@@ -183,6 +173,26 @@ main = do
       else throwM e
     processUnauthorizedException e =
       throwM e
+
+
+getPort :: IO Int
+getPort =
+  maybe 8000 read <$> lookupEnv "PORT"
+
+
+getOnedriveClientId :: IO T.Text
+getOnedriveClientId =
+  maybe "000000004816D42C" T.pack <$> lookupEnv "ONEDRIVE_CLIENT_ID"
+
+
+getOnedriveClientSecret :: IO T.Text
+getOnedriveClientSecret =
+  maybe "-4tKnVPaAyIEAgYrBp8R6jTYY0zClN6c" T.pack <$> lookupEnv "ONEDRIVE_CLIENT_SECRET"
+
+
+getAppBaseUrl :: IO T.Text
+getAppBaseUrl =
+  maybe "http://localhost:8000" T.pack <$> lookupEnv "APP_BASE_URL"
 
 
 data Options =

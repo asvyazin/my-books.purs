@@ -1,21 +1,18 @@
 module Common.OneDriveApi where
 
 
+import Common.AjaxHelper (doJsonRequest)
 import Common.Json ((.??))
 import Control.Monad.Aff (Aff)
-import Control.Monad.Eff.Exception (Error, error)
-import Control.Monad.Error.Class (class MonadError, throwError)
 import Data.Argonaut.Combinators ((.?), (?>>=))
 import Data.Argonaut.Core (toArray, toObject)
 import Data.Argonaut.Decode (class DecodeJson, decodeJson)
-import Data.Argonaut.Parser (jsonParser)
-import Data.Either (either)
 import Data.Generic (class Generic)
 import Data.Maybe (Maybe, maybe)
 import Data.StrMap as M
 import Data.Traversable (traverse)
 import Global (encodeURIComponent)
-import Network.HTTP.Affjax (AJAX, AffjaxRequest, AffjaxResponse, defaultRequest, affjax)
+import Network.HTTP.Affjax (AJAX, defaultRequest, AffjaxRequest)
 import Network.HTTP.Method (Method(GET))
 import Network.HTTP.RequestHeader (RequestHeader(RequestHeader))
 import Prelude
@@ -201,14 +198,3 @@ onedriveApiBaseUrl = "https://api.onedrive.com/v1.0"
 
 graphApiBaseUrl :: String
 graphApiBaseUrl = "https://apis.live.net/v5.0"
-
-
-doJsonRequest :: forall e a. (DecodeJson a) => AffjaxRequest Unit -> Aff (ajax :: AJAX | e) a
-doJsonRequest req =
-  affjax req >>= getJson
-
-
-getJson :: forall m a. (DecodeJson a, MonadError Error m) => AffjaxResponse String -> m a
-getJson resp = do
-  let result = jsonParser resp.response >>= decodeJson
-  either (throwError <<< error) return result

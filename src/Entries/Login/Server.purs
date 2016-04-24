@@ -1,17 +1,18 @@
 module Entries.Login.Server where
 
 
-import React as R
-import ReactDOM as R
+import React (createFactory) as R
+import ReactDOM (renderToString) as R
 import Entries.Login.Class
 
 
-serverSideRender :: String
-serverSideRender =
+serverSideRender :: String -> String -> String
+serverSideRender appBaseUrl clientId =
   let
     props =
       { scope : "wl.signin onedrive.readonly"
-      , clientId : "000000004816D42C"
+      , clientId : clientId
+      , appBaseUrl : appBaseUrl
       }
   in
    R.renderToString (R.createFactory component props)

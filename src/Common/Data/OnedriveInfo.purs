@@ -3,7 +3,7 @@ module Common.Data.OnedriveInfo where
 
 import Common.Json ((.??))
 import Data.Argonaut.Core (fromObject, toObject)
-import Data.Argonaut.Combinators ((:=), (~>), (?>>=), (.?))
+import Data.Argonaut.Combinators ((:=), (?>>=), (.?))
 import Data.Argonaut.Decode (class DecodeJson)
 import Data.Argonaut.Encode (class EncodeJson)
 import Data.List (toList)
