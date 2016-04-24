@@ -9,6 +9,7 @@ import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Class (lift)
 import Data.Aeson (toJSON)
 import Data.Maybe (fromJust)
+import Data.Monoid ((<>))
 import qualified Data.Text as T (Text, concat)
 import qualified Data.Text.Encoding as T (decodeUtf8)
 import qualified Data.Text.Lazy as TL
@@ -18,6 +19,7 @@ import Network.HTTP.Types.Status (unauthorized401)
 import Network.Wai (queryString)
 import qualified Network.Wai.Middleware.Static as Wai
 import Onedrive (OauthTokenRequest(..), oauthTokenRequest, me, OauthTokenResponse(..))
+import Options.Applicative (Parser, switch, long, help, execParser, info, helper, fullDesc)
 import ReactRender (render)
 import System.Directory (getCurrentDirectory)
 import System.Environment (lookupEnv, getExecutablePath)
@@ -112,6 +114,7 @@ getPort = do
 main :: IO ()
 main = do
   port <- getPort
+  opts <- execParser $ info (helper <*> options) fullDesc
   runSpock port $ spockT id $ do
     currentDirectory <- liftIO $ getCurrentDirectory
     let policy =
@@ -130,12 +133,22 @@ main = do
   
     get "/" $ maybeT (redirect "/login") return $ do
       onedriveTokenCookie <- hoistMaybeM $ cookie "onedriveToken"
-      meUser <- hoistMaybeM $ lift $ catchUnauthorizedException $ C.withManager $ me onedriveTokenCookie
-      rendered <- lift $ render "public/js/index.server.bundle.js" [toJSON $ meUser ^. displayName, toJSON onedriveTokenCookie]
+      rendered <-
+        if serverSideRendering opts
+        then do
+          meUser <- hoistMaybeM $ lift $ catchUnauthorizedException $ C.withManager $ me onedriveTokenCookie
+          lift $ render "public/js/index.server.bundle.js" [toJSON $ meUser ^. displayName, toJSON onedriveTokenCookie]
+        else
+          return ""
       lift $ html $ renderHtml $ indexPage rendered
 
     get "login" $ do
-      rendered <- render "public/js/login.server.bundle.js" []
+      rendered <-
+        if serverSideRendering opts
+        then
+          render "public/js/login.server.bundle.js" []
+        else
+          return ""
       html $ renderHtml $ loginPage rendered
   
     get "onedrive-redirect" $ do
@@ -170,3 +183,14 @@ main = do
       else throwM e
     processUnauthorizedException e =
       throwM e
+
+
+data Options =
+  Options
+  { serverSideRendering :: Bool
+  } deriving (Show)
+
+
+options :: Parser Options
+options =
+  Options <$> switch (long "server-side-rendering" <> help "Enables server-side react rendering")
