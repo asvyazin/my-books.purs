@@ -2,6 +2,7 @@ module Entries.Index where
 
 
 import Common.Data.OnedriveInfo (OnedriveInfo(OnedriveInfo), defaultOnedriveInfo, onedriveInfoId)
+import Common.Data.ServerEnvironmentInfo (ServerEnvironmentInfo(..), getServerEnvironment)
 import Common.Data.UserInfo (UserInfo(UserInfo), userInfoId) as U
 import Common.Monad (guardEither)
 import Common.OneDriveApi (getUserInfo, UserInfo(UserInfo))
@@ -39,12 +40,13 @@ main = launchAff $ do
       liftEff $ redirect "/login"
     Just onedriveToken ->
       (do
+          (ServerEnvironmentInfo serverEnvironment) <- getServerEnvironment
           u@(UserInfo userInfo) <- getUserInfo onedriveToken
           let
             dbName =
               encodeURIComponent $ "my-books/" ++ userInfo._id
             remoteDb =
-              "http://localhost:5984/" ++ dbName
+              serverEnvironment.couchdbServer ++ "/" ++ dbName
           localDb <- liftEff $ DB.newPouchDB dbName
           void $ liftEff $ DB.sync localDb remoteDb { live: true, retry: true }
           updateOneDriveInfoInDbIfNeeded localDb onedriveToken

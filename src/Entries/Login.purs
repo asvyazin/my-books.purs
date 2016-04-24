@@ -1,7 +1,6 @@
 module Entries.Login where
 
-import Common.AjaxHelper (doJsonRequest)
-import Control.Monad.Aff (Aff, launchAff)
+import Control.Monad.Aff (launchAff)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Exception (EXCEPTION)
@@ -13,12 +12,11 @@ import DOM.HTML.Types (htmlDocumentToParentNode)
 import DOM.HTML.Window (document)
 import DOM.Node.ParentNode (querySelector)
 import Entries.Login.Class (component)
-import Network.HTTP.Affjax (AJAX, defaultRequest)
-import Network.HTTP.Method (Method(GET))
+import Network.HTTP.Affjax (AJAX)
 import Prelude
 import React (createFactory) as R
 import ReactDOM (render) as R
-import Common.Data.ServerEnvironmentInfo (ServerEnvironmentInfo(..))
+import Common.Data.ServerEnvironmentInfo (ServerEnvironmentInfo(..), getServerEnvironment)
 
 
 main :: Eff (dom :: DOM, ajax :: AJAX, err :: EXCEPTION) Unit
@@ -33,11 +31,3 @@ main = launchAff $ do
       , appBaseUrl : serverEnvironment.appBaseUrl
       }
   liftEff $ void $ R.render (R.createFactory component props) container
-
-
-getServerEnvironment :: forall e. Aff (ajax :: AJAX | e) ServerEnvironmentInfo
-getServerEnvironment =
-  doJsonRequest $ defaultRequest
-  { method = GET
-  , url = "/server-environment"
-  }

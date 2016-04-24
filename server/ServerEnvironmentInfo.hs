@@ -10,9 +10,10 @@ data ServerEnvironmentInfo =
   ServerEnvironmentInfo
   { _appBaseUrl :: T.Text
   , _onedriveClientId :: T.Text
+  , _couchdbServer :: T.Text
   }
 
 
 instance ToJSON ServerEnvironmentInfo where
-  toJSON (ServerEnvironmentInfo appBaseUrl onedriveClientId) =
-    object [ "appBaseUrl" .= appBaseUrl, "onedriveClientId" .= onedriveClientId ]
+  toJSON (ServerEnvironmentInfo appBaseUrl onedriveClientId couchdbServer) =
+    object [ "appBaseUrl" .= appBaseUrl, "onedriveClientId" .= onedriveClientId, "couchdbServer" .= couchdbServer ]

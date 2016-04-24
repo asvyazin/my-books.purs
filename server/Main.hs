@@ -101,6 +101,7 @@ main = do
   onedriveClientId <- getOnedriveClientId
   onedriveClientSecret <- getOnedriveClientSecret
   appBaseUrl <- getAppBaseUrl
+  couchdbServer <- getCouchdbServer
   opts <- execParser $ info (helper <*> options) fullDesc
   runSpock port $ spockT id $ do
     currentDirectory <- liftIO $ getCurrentDirectory
@@ -153,7 +154,7 @@ main = do
       redirect "/"
 
     get "server-environment" $
-      json $ ServerEnvironmentInfo appBaseUrl onedriveClientId
+      json $ ServerEnvironmentInfo appBaseUrl onedriveClientId couchdbServer
 
   where
     pa _ [] = Nothing
@@ -193,6 +194,11 @@ getOnedriveClientSecret =
 getAppBaseUrl :: IO T.Text
 getAppBaseUrl =
   maybe "http://localhost:8000" T.pack <$> lookupEnv "APP_BASE_URL"
+
+
+getCouchdbServer :: IO T.Text
+getCouchdbServer =
+  maybe "http://localhost:5984" T.pack <$> lookupEnv "COUCHDB_SERVER"
 
 
 data Options =

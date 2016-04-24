@@ -16,7 +16,8 @@ executable MyBooks
   main-is:             Main.hs
   other-modules:       Onedrive,
                        UserInfo,
-                       ReactRender
+                       ReactRender,
+                       ServerEnvironmentInfo
   -- other-extensions:    
   build-depends:       base,
                        Spock,
