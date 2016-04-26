@@ -10,10 +10,11 @@ import Components.AjaxLoader as AjaxLoader
 import Components.BooksDirectory as BooksDirectory
 import Components.Header as Header
 import Control.Monad (when)
-import Control.Monad.Aff (launchAff)
+import Control.Monad.Aff (launchAff, Aff)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.Eff.Exception (EXCEPTION)
+import Control.Monad.Eff.Exception (EXCEPTION, Error)
+import Control.Monad.Error.Class (catchError)
 import Data.Foldable (fold)
 import Data.Maybe (Maybe(..), fromMaybe)
 import DOM (DOM)
@@ -41,7 +42,7 @@ type State =
   Maybe LoadState
 
 
-spec :: forall eff props action. T.Spec (ajax :: AJAX, err :: EXCEPTION, pouchdb :: POUCHDB | eff) State props action
+spec :: forall eff props action. T.Spec (ajax :: AJAX, err :: EXCEPTION, pouchdb :: POUCHDB, dom :: DOM | eff) State props action
 spec =
   T.withState $ \st ->
                   case st of
@@ -80,20 +81,30 @@ component =
       case maybeOnedriveToken of
         Nothing ->
           redirect "/login"
-        Just onedriveToken -> launchAff $ do
-          (ServerEnvironmentInfo serverEnvironment) <- getServerEnvironment
-          u@(UserInfo userInfo) <- getUserInfo onedriveToken
-          let
-            dbName =
-              encodeURIComponent $ "my-books/" ++ userInfo._id
-            remoteDbName =
-              serverEnvironment.couchdbServer ++ "/" ++ dbName
-          localDb <- liftEff $ newPouchDB dbName
-          remoteDb <- liftEff $ newPouchDB remoteDbName
-          void $ liftEff $ sync localDb remoteDb { live: true, retry: true }
-          updateOneDriveInfoInDbIfNeeded localDb onedriveToken
-          updateUserInfoInDbIfNeeded localDb u
-          liftEff $ R.transformState this (\_ -> Just { onedriveToken, db : localDb, userName : userInfo.displayName })
+        Just onedriveToken -> launchAff $
+          (do
+              (ServerEnvironmentInfo serverEnvironment) <- getServerEnvironment
+              u@(UserInfo userInfo) <- getUserInfo onedriveToken
+              let
+                dbName =
+                  encodeURIComponent $ "my-books/" ++ userInfo._id
+                remoteDbName =
+                  serverEnvironment.couchdbServer ++ "/" ++ dbName
+              localDb <- liftEff $ newPouchDB dbName
+              remoteDb <- liftEff $ newPouchDB remoteDbName
+              void $ liftEff $ sync localDb remoteDb { live: true, retry: true }
+              updateOneDriveInfoInDbIfNeeded localDb onedriveToken
+              updateUserInfoInDbIfNeeded localDb u
+              let
+                newState =
+                  { onedriveToken
+                  , db : localDb
+                  , userName : userInfo.displayName
+                  }
+              void $ liftEff $ R.transformState this (\_ -> Just newState)) `catchError` handleError
+
+    handleError :: forall e. Error -> Aff (dom :: DOM | e) Unit
+    handleError = const $ liftEff $ redirect "/login"
 
 
 defaultState :: State
