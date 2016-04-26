@@ -1,15 +1,15 @@
 module Components.Header where
 
 
-import Common.React
-import Data.Foldable
-import Data.Lens
-import Data.Maybe
+import Common.React (mapProps, maybeProps)
+import Data.Foldable (fold)
+import Data.Lens (over)
+import Data.Maybe (Maybe)
 import Prelude
-import qualified React as R
-import qualified React.DOM as R
-import qualified React.DOM.Props as RP
-import qualified Thermite as T
+import React (ReactElement, createElement) as R
+import React.DOM (text, div, a, li', ul, nav) as R
+import React.DOM.Props as RP
+import Thermite as T
 
 
 type Props =

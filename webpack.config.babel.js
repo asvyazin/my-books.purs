@@ -9,10 +9,7 @@ var modulesDirectories = [
 
 module.exports = {
     entry: {
-	index: './js/Index.js',
-	'index.server': './src/Entries/Index/Server.purs',
-	login: './js/Login.js',
-	'login.server': './src/Entries/Login/Server.purs'
+	app: './js/App.js'
     },
     output: {
 	path: path.resolve(__dirname, "public/js"),

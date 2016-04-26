@@ -1,72 +1,120 @@
 module Entries.Index where
 
 
-import Common.Data.OnedriveInfo (OnedriveInfo(OnedriveInfo), defaultOnedriveInfo, onedriveInfoId)
+import Common.Data.OnedriveInfo (OnedriveInfo(..), defaultOnedriveInfo, onedriveInfoId)
 import Common.Data.ServerEnvironmentInfo (ServerEnvironmentInfo(..), getServerEnvironment)
-import Common.Data.UserInfo (UserInfo(UserInfo), userInfoId) as U
-import Common.Monad (guardEither)
+import Common.Data.UserInfo as U
 import Common.OneDriveApi (getUserInfo, UserInfo(UserInfo))
+import Common.React (mapProps)
+import Components.AjaxLoader as AjaxLoader
+import Components.BooksDirectory as BooksDirectory
+import Components.Header as Header
 import Control.Monad (when)
-import Control.Monad.Aff (liftEff', launchAff, Aff)
+import Control.Monad.Aff (launchAff)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.Eff.Exception (EXCEPTION, Error)
-import Control.Monad.Error.Class (catchError)
+import Control.Monad.Eff.Exception (EXCEPTION)
+import Data.Foldable (fold)
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Maybe.Unsafe (fromJust)
-import Data.Nullable (toMaybe)
 import DOM (DOM)
 import DOM.HTML (window)
 import DOM.HTML.Location (setHref)
-import DOM.HTML.Types (htmlDocumentToParentNode)
-import DOM.HTML.Window (document, location)
-import DOM.Node.ParentNode (querySelector)
-import Entries.Index.Class (component)
+import DOM.HTML.Window (location)
 import Global (encodeURIComponent)
-import Libs.PouchDB (POUCHDB, PouchDB, PouchDBAff, sync, newPouchDB) as DB
-import Libs.PouchDB.Json (putJson, tryGetJson) as DB
+import Libs.PouchDB (POUCHDB, PouchDB, newPouchDB, sync, PouchDBAff)
+import Libs.PouchDB.Json (putJson, tryGetJson)
 import Network.HTTP.Affjax (AJAX)
 import Prelude
-import React (createFactory) as R
-import ReactDOM (render) as R
-import Web.Cookies (COOKIE, getCookie)
+import React as R
+import Thermite as T
+import Web.Cookies (getCookie)
 
 
-main :: Eff (cookie :: COOKIE, ajax :: AJAX, dom :: DOM, err :: EXCEPTION, pouchdb :: DB.POUCHDB) Unit
-main = launchAff $ do
-  maybeOnedriveToken <- liftEff $ getCookie "onedriveToken"
-  case maybeOnedriveToken of
-    Nothing ->
-      liftEff $ redirect "/login"
-    Just onedriveToken ->
-      (do
+type LoadState =
+  { userName :: String
+  , onedriveToken :: String
+  , db :: PouchDB
+  }
+
+
+type State =
+  Maybe LoadState
+
+
+spec :: forall eff props action. T.Spec (ajax :: AJAX, err :: EXCEPTION, pouchdb :: POUCHDB | eff) State props action
+spec =
+  T.withState $ \st ->
+                  case st of
+                    Nothing ->
+                      AjaxLoader.spec
+                    Just s ->
+                      fold [ mapProps (convertToHeaderProps s) Header.spec
+                           , T.simpleSpec T.defaultPerformAction renderBooksDirectory
+                           ]
+  where
+    convertToHeaderProps s _ =
+      { title: "MyBooks"
+      , userName: Just s.userName
+      , error: Nothing
+      }
+
+    renderBooksDirectory _ _ (Just state) _ =
+      [ BooksDirectory.booksDirectory $ convertToBooksDirectoryProps state ]
+    renderBooksDirectory _ _ _ _ = []
+
+    convertToBooksDirectoryProps s =
+      { onedriveToken: s.onedriveToken
+      , db: Just s.db
+      }
+
+
+component :: forall props. R.ReactClass props
+component =
+  R.createClass reactSpec.spec { componentDidMount = componentDidMount }
+  where
+    reactSpec =
+      T.createReactSpec spec defaultState
+
+    componentDidMount this = do
+      maybeOnedriveToken <- getCookie "onedriveToken"
+      case maybeOnedriveToken of
+        Nothing ->
+          redirect "/login"
+        Just onedriveToken -> launchAff $ do
           (ServerEnvironmentInfo serverEnvironment) <- getServerEnvironment
           u@(UserInfo userInfo) <- getUserInfo onedriveToken
           let
             dbName =
               encodeURIComponent $ "my-books/" ++ userInfo._id
-            remoteDb =
+            remoteDbName =
               serverEnvironment.couchdbServer ++ "/" ++ dbName
-          localDb <- liftEff $ DB.newPouchDB dbName
-          void $ liftEff $ DB.sync localDb remoteDb { live: true, retry: true }
+          localDb <- liftEff $ newPouchDB dbName
+          remoteDb <- liftEff $ newPouchDB remoteDbName
+          void $ liftEff $ sync localDb remoteDb { live: true, retry: true }
           updateOneDriveInfoInDbIfNeeded localDb onedriveToken
           updateUserInfoInDbIfNeeded localDb u
-          liftEff' (renderMain userInfo.displayName onedriveToken localDb) >>= guardEither
-      ) `catchError` handleError
-  where
-    handleError :: forall e. Error -> Aff (dom :: DOM | e) Unit
-    handleError = const $ liftEff $ redirect "/login"
+          liftEff $ R.transformState this (\_ -> Just { onedriveToken, db : localDb, userName : userInfo.displayName })
 
 
-updateOneDriveInfoInDbIfNeeded :: forall e. DB.PouchDB -> String -> DB.PouchDBAff e Unit
+defaultState :: State
+defaultState =
+  Nothing
+
+
+redirect :: forall e. String -> Eff (dom :: DOM | e) Unit
+redirect url =
+  void $ window >>= location >>= setHref url
+
+
+updateOneDriveInfoInDbIfNeeded :: forall e. PouchDB -> String -> PouchDBAff e Unit
 updateOneDriveInfoInDbIfNeeded db onedriveToken = do
-  OnedriveInfo onedriveInfo <- fromMaybe defaultOnedriveInfo <$> DB.tryGetJson db onedriveInfoId
-  when (onedriveInfo.token /= Just onedriveToken) $ DB.putJson db $ OnedriveInfo $ onedriveInfo { token = Just onedriveToken }
+  OnedriveInfo onedriveInfo <- fromMaybe defaultOnedriveInfo <$> tryGetJson db onedriveInfoId
+  when (onedriveInfo.token /= Just onedriveToken) $ putJson db $ OnedriveInfo $ onedriveInfo { token = Just onedriveToken }
 
 
-updateUserInfoInDbIfNeeded :: forall e. DB.PouchDB -> UserInfo -> DB.PouchDBAff e Unit
+updateUserInfoInDbIfNeeded :: forall e. PouchDB -> UserInfo -> PouchDBAff e Unit
 updateUserInfoInDbIfNeeded db (UserInfo info) = do
-  maybeUserInfo <- DB.tryGetJson db U.userInfoId
+  maybeUserInfo <- tryGetJson db U.userInfoId
   case maybeUserInfo of
     Nothing -> do
       let
@@ -76,7 +124,7 @@ updateUserInfoInDbIfNeeded db (UserInfo info) = do
           , _rev : ""
           , displayName : info.displayName
           }
-      DB.putJson db newUserInfo
+      putJson db newUserInfo
     Just (U.UserInfo userInfo) ->
       when (userInfo.displayName /= info.displayName) $ do
         let
@@ -84,22 +132,4 @@ updateUserInfoInDbIfNeeded db (UserInfo info) = do
             U.UserInfo userInfo
             { displayName = info.displayName
             }
-        DB.putJson db newUserInfo
-
-
-renderMain :: forall e. String -> String -> DB.PouchDB -> Eff (dom :: DOM, pouchdb :: DB.POUCHDB, ajax :: AJAX | e) Unit
-renderMain user onedriveToken db = do
-    node <- htmlDocumentToParentNode <$> (window >>= document)
-    container <- (fromJust <<< toMaybe) <$> querySelector ".application" node
-    let
-      props =
-        { onedriveToken
-        , db: Just db
-        , userName: Just user
-        }
-    void $ R.render (R.createFactory component props) container
-
-
-redirect :: forall e. String -> Eff (dom :: DOM | e) Unit
-redirect url =
-  void $ window >>= location >>= setHref url
+        putJson db newUserInfo

@@ -54,12 +54,69 @@ import Web.Spock (runSpock,
                   request,
                   setCookie,
                   defaultCookieSettings,
-                  json)
+                  json,
+                  hookAny,
+                  StdMethod(GET))
 
 
-ie10comment :: H.Html -> H.Html
-ie10comment htmlContent = H.textComment $ T.concat ["[if lt IE 10]>", content, "<![endif]"]
-  where content = renderHtml htmlContent
+main :: IO ()
+main = do
+  port <- getPort
+  onedriveClientId <- getOnedriveClientId
+  onedriveClientSecret <- getOnedriveClientSecret
+  appBaseUrl <- getAppBaseUrl
+  couchdbServer <- getCouchdbServer
+  opts <- execParser $ info (helper <*> options) fullDesc
+  runSpock port $ spockT id $ do
+    currentDirectory <- liftIO getCurrentDirectory
+    let policy =
+          Wai.only [ ("bootstrap/css/bootstrap.min.css", currentDirectory </> "bower_components" </> "bootstrap-theme-bootswatch-flatly" </> "css" </> "bootstrap.min.css")
+                   , ("bootstrap/fonts/glyphicons-halflings-regular.eot", currentDirectory </> "bower_components" </> "bootstrap" </> "dist" </> "fonts" </> "glyphicons-halflings-regular.eot")
+                   , ("bootstrap/fonts/glyphicons-halflings-regular.svg", currentDirectory </> "bower_components" </> "bootstrap" </> "dist" </> "fonts" </> "glyphicons-halflings-regular.svg")
+                   , ("bootstrap/fonts/glyphicons-halflings-regular.ttf", currentDirectory </> "bower_components" </> "bootstrap" </> "dist" </> "fonts" </> "glyphicons-halflings-regular.ttf")
+                   , ("bootstrap/fonts/glyphicons-halflings-regular.woff", currentDirectory </> "bower_components" </> "bootstrap" </> "dist" </> "fonts" </> "glyphicons-halflings-regular.woff")
+                   , ("bootstrap/fonts/glyphicons-halflings-regular.woff2", currentDirectory </> "bower_components" </> "bootstrap" </> "dist" </> "fonts" </> "glyphicons-halflings-regular.woff2")
+                   , ("react-treeview/css/react-treeview.css", currentDirectory </> "node_modules" </> "react-treeview" </> "react-treeview.css")
+                   , ("js/app.bundle.js", currentDirectory </> "public" </> "js" </> "app.bundle.js")
+                   , ("images/ajax-loader.gif", currentDirectory </> "images" </> "ajax-loader.gif")
+                   ]
+    middleware $ Wai.staticPolicy policy
+  
+    get "onedrive-redirect" $ do
+      qs <- queryString <$> request
+      let c = pa "code" qs
+      let req =
+            OauthTokenRequest
+            { clientId = onedriveClientId
+            , redirectUri = appBaseUrl <> "/onedrive-redirect"
+            , clientSecret = onedriveClientSecret
+            , code = T.decodeUtf8 $ fromJust c
+            }
+      tokenResp <- lift $ C.withManager $ oauthTokenRequest req
+      setCookie "onedriveToken" (accessToken tokenResp) defaultCookieSettings
+      redirect "/"
+
+    get "server-environment" $
+      json $ ServerEnvironmentInfo appBaseUrl onedriveClientId couchdbServer
+
+    hookAny GET $ \_ ->
+      html $ renderHtml appPage
+
+  where
+    pa _ [] = Nothing
+    pa par ((p, v) : qs)
+      | p == par = v
+      | otherwise = pa par qs
+
+
+renderHtml :: H.Html -> T.Text
+renderHtml =
+  TL.toStrict . H.renderHtml
+
+
+appPage :: H.Html
+appPage =
+  withMaster "/js/app.bundle.js" $ H.div H.! HA.class_ "application" $ ""
 
 
 withMaster :: T.Text -> H.Html -> H.Html
@@ -80,100 +137,9 @@ withMaster mainScript childrenMarkup = H.docTypeHtml $ do
     H.script H.! HA.src (H.toValue mainScript) $ ""
 
 
-indexPage :: H.Html -> H.Html
-indexPage rendered =
-  withMaster "/js/index.bundle.js" $ H.div H.! HA.class_ "application" $ rendered
-
-
-loginPage :: H.Html -> H.Html
-loginPage rendered =
-  withMaster "/js/login.bundle.js" $ H.div H.! HA.class_ "application" $ rendered
-
-
-renderHtml :: H.Html -> T.Text
-renderHtml =
-  TL.toStrict . H.renderHtml
-
-
-main :: IO ()
-main = do
-  port <- getPort
-  onedriveClientId <- getOnedriveClientId
-  onedriveClientSecret <- getOnedriveClientSecret
-  appBaseUrl <- getAppBaseUrl
-  couchdbServer <- getCouchdbServer
-  opts <- execParser $ info (helper <*> options) fullDesc
-  runSpock port $ spockT id $ do
-    currentDirectory <- liftIO $ getCurrentDirectory
-    let policy =
-          Wai.only [ ("bootstrap/css/bootstrap.min.css", currentDirectory </> "bower_components" </> "bootstrap-theme-bootswatch-flatly" </> "css" </> "bootstrap.min.css")
-                   , ("bootstrap/fonts/glyphicons-halflings-regular.eot", currentDirectory </> "bower_components" </> "bootstrap" </> "dist" </> "fonts" </> "glyphicons-halflings-regular.eot")
-                   , ("bootstrap/fonts/glyphicons-halflings-regular.svg", currentDirectory </> "bower_components" </> "bootstrap" </> "dist" </> "fonts" </> "glyphicons-halflings-regular.svg")
-                   , ("bootstrap/fonts/glyphicons-halflings-regular.ttf", currentDirectory </> "bower_components" </> "bootstrap" </> "dist" </> "fonts" </> "glyphicons-halflings-regular.ttf")
-                   , ("bootstrap/fonts/glyphicons-halflings-regular.woff", currentDirectory </> "bower_components" </> "bootstrap" </> "dist" </> "fonts" </> "glyphicons-halflings-regular.woff")
-                   , ("bootstrap/fonts/glyphicons-halflings-regular.woff2", currentDirectory </> "bower_components" </> "bootstrap" </> "dist" </> "fonts" </> "glyphicons-halflings-regular.woff2")
-                   , ("react-treeview/css/react-treeview.css", currentDirectory </> "node_modules" </> "react-treeview" </> "react-treeview.css")
-                   , ("js/login.bundle.js", currentDirectory </> "public" </> "js" </> "login.bundle.js")
-                   , ("js/index.bundle.js", currentDirectory </> "public" </> "js" </> "index.bundle.js")
-                   , ("images/ajax-loader.gif", currentDirectory </> "images" </> "ajax-loader.gif")
-                   ]
-    middleware $ Wai.staticPolicy policy
-  
-    get "/" $ maybeT (redirect "/login") return $ do
-      onedriveTokenCookie <- hoistMaybeM $ cookie "onedriveToken"
-      rendered <-
-        if serverSideRendering opts
-        then do
-          meUser <- hoistMaybeM $ lift $ catchUnauthorizedException $ C.withManager $ me onedriveTokenCookie
-          lift $ render "public/js/index.server.bundle.js" [toJSON $ meUser ^. displayName, toJSON onedriveTokenCookie]
-        else
-          return ""
-      lift $ html $ renderHtml $ indexPage rendered
-
-    get "login" $ do
-      rendered <-
-        if serverSideRendering opts
-        then
-          render "public/js/login.server.bundle.js" [toJSON appBaseUrl, toJSON onedriveClientId]
-        else
-          return ""
-      html $ renderHtml $ loginPage rendered
-  
-    get "onedrive-redirect" $ do
-      qs <- queryString <$> request
-      let c = pa "code" qs
-      let req =
-            OauthTokenRequest
-            { clientId = onedriveClientId
-            , redirectUri = appBaseUrl <> "/onedrive-redirect"
-            , clientSecret = onedriveClientSecret
-            , code = T.decodeUtf8 $ fromJust c
-            }
-      tokenResp <- lift $ C.withManager $ oauthTokenRequest req
-      setCookie "onedriveToken" (accessToken tokenResp) defaultCookieSettings
-      redirect "/"
-
-    get "server-environment" $
-      json $ ServerEnvironmentInfo appBaseUrl onedriveClientId couchdbServer
-
-  where
-    pa _ [] = Nothing
-    pa par ((p, v) : qs)
-      | p == par = v
-      | otherwise = pa par qs
-
-    hoistMaybeM r =
-      lift r >>= hoistMaybe
-
-    catchUnauthorizedException r =
-      fmap Just r `catch` processUnauthorizedException
-
-    processUnauthorizedException e@(StatusCodeException s _ _) =
-      if s == unauthorized401
-      then return Nothing
-      else throwM e
-    processUnauthorizedException e =
-      throwM e
+ie10comment :: H.Html -> H.Html
+ie10comment htmlContent = H.textComment $ T.concat ["[if lt IE 10]>", content, "<![endif]"]
+  where content = renderHtml htmlContent
 
 
 getPort :: IO Int

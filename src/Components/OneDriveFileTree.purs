@@ -156,9 +156,9 @@ spec =
             when (not state.loaded) $ do
               childrenData <- getChildrenByItemId props.onedriveToken props.itemId
               let
-                children =
+                newChildren =
                   map child $ filter isDirectory childrenData
-              (liftEff' $ update $ \(State s) -> State s { collapsed = false, loaded = true, children = children }) >>= guardEither
+              (liftEff' $ update $ \(State s) -> State s { collapsed = false, loaded = true, children = newChildren }) >>= guardEither
 
         isDirectory (OneDriveItem item) =
           isJust item.folder

@@ -1,33 +1,94 @@
 module Entries.Login where
 
-import Control.Monad.Aff (launchAff)
-import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.Eff.Exception (EXCEPTION)
-import Data.Maybe.Unsafe (fromJust)
-import Data.Nullable (toMaybe)
-import DOM (DOM)
-import DOM.HTML (window)
-import DOM.HTML.Types (htmlDocumentToParentNode)
-import DOM.HTML.Window (document)
-import DOM.Node.ParentNode (querySelector)
-import Entries.Login.Class (component)
-import Network.HTTP.Affjax (AJAX)
-import Prelude
-import React (createFactory) as R
-import ReactDOM (render) as R
+
 import Common.Data.ServerEnvironmentInfo (ServerEnvironmentInfo(..), getServerEnvironment)
+import Common.React (mapProps, maybeState)
+import Components.Header as Header
+import Components.Wrappers.Button as Button
+import Components.Wrappers.Glyphicon as Glyphicon
+import Control.Monad.Aff (launchAff)
+import Control.Monad.Eff.Class (liftEff)
+import Data.List (List(..), fromList, toList)
+import Data.Maybe (Maybe(..))
+import Data.String (joinWith)
+import Data.Tuple (Tuple(Tuple))
+import Global (encodeURIComponent)
+import Prelude
+import React (ReactClass, transformState, createClass) as R
+import React.DOM (text, div) as R
+import React.DOM.Props as RP
+import Thermite as T
 
 
-main :: Eff (dom :: DOM, ajax :: AJAX, err :: EXCEPTION) Unit
-main = launchAff $ do
-  node <- liftEff $ htmlDocumentToParentNode <$> (window >>= document)
-  container <- liftEff $ (fromJust <<< toMaybe) <$> querySelector ".application" node
-  (ServerEnvironmentInfo serverEnvironment) <- getServerEnvironment
-  let
-    props =
-      { scope : "wl.signin onedrive.readonly"
-      , clientId : serverEnvironment.onedriveClientId
-      , appBaseUrl : serverEnvironment.appBaseUrl
+type State =
+  { clientId :: String
+  , appBaseUrl :: String
+  }
+
+
+component :: forall props. R.ReactClass props
+component =
+  R.createClass reactSpec.spec { componentDidMount = componentDidMount }
+  where
+    reactSpec =
+      T.createReactSpec spec Nothing
+    
+    componentDidMount this = launchAff $ do
+      (ServerEnvironmentInfo serverEnvironment) <- getServerEnvironment
+      let newState =
+            { clientId : serverEnvironment.onedriveClientId
+            , appBaseUrl : serverEnvironment.appBaseUrl
+            }
+      liftEff $ R.transformState this (\_ -> Just newState)
+
+
+spec :: forall eff props action. T.Spec eff (Maybe State) props action
+spec =
+  mapProps (\_ -> headerProps) Header.spec <> maybeState loginButton
+  where
+    headerProps =
+      { title: "MyBooks"
+      , userName: Nothing
+      , error: Nothing
       }
-  liftEff $ void $ R.render (R.createFactory component props) container
+
+
+loginButton :: forall eff props action. T.Spec eff State props action
+loginButton =
+  T.simpleSpec T.defaultPerformAction render
+  where
+    render dispatch _ state _ =
+      [ R.div
+        [ RP.className "col-md-offset-5 col-md-2" ]
+        [ Button.button
+          { bsSize : "large"
+          , href : loginUrl state
+          }
+          [ Glyphicon.glyphicon' "cloud"
+          , R.text " Login to OneDrive"
+          ]
+        ]
+      ]
+
+    loginParams state =
+      [ (Tuple "client_id" state.clientId)
+      , (Tuple "scope" "wl.signin onedrive.readonly")
+      , (Tuple "response_type" "code")
+      , (Tuple "redirect_uri" (state.appBaseUrl <> "/onedrive-redirect"))
+      ]
+
+    loginUrl =
+      buildUrl "https://login.live.com/oauth20_authorize.srf" <<< toList <<< loginParams
+
+
+buildUrl :: String -> List (Tuple String String) -> String
+buildUrl baseUrl Nil =
+  baseUrl
+buildUrl baseUrl params =
+  baseUrl ++ "?" ++ queryString
+  where
+    formatParam (Tuple p v) =
+      encodeURIComponent p ++ "=" ++ encodeURIComponent v
+
+    queryString =
+      joinWith "&" $ fromList $ map formatParam params

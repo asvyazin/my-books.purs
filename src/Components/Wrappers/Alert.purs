@@ -1,8 +1,8 @@
 module Components.Wrappers.Alert where
 
 
-import qualified React as R
-import qualified Thermite as T
+import React as R
+import Thermite as T
 
 
 foreign import alertFFI :: forall props. R.ReactClass props
