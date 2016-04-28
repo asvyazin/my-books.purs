@@ -79,3 +79,6 @@ foreign import sync :: forall srcType destType optionsType e. srcType -> destTyp
 
 
 foreign import cancel :: forall e. PouchDBSync -> PouchDBEff e Unit
+
+
+foreign import debugEnable :: forall e. String -> PouchDBEff e Unit

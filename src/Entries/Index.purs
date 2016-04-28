@@ -13,7 +13,8 @@ import Control.Monad (when)
 import Control.Monad.Aff (launchAff, Aff)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.Eff.Exception (EXCEPTION, Error)
+import Control.Monad.Eff.Console (log, CONSOLE)
+import Control.Monad.Eff.Exception (EXCEPTION, Error, message)
 import Control.Monad.Error.Class (catchError)
 import Data.Foldable (fold)
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -87,14 +88,17 @@ component =
               u@(UserInfo userInfo) <- getUserInfo onedriveToken
               let
                 dbName =
-                  encodeURIComponent $ "my-books/" ++ userInfo._id
+                  encodeURIComponent $ "my-books/" <> userInfo._id
                 remoteDbName =
-                  serverEnvironment.couchdbServer ++ "/" ++ dbName
+                  serverEnvironment.couchdbServer <> "/" <> dbName
+                globalDbName =
+                  serverEnvironment.couchdbServer <> "/my-books"
               localDb <- liftEff $ newPouchDB dbName
               remoteDb <- liftEff $ newPouchDB remoteDbName
               void $ liftEff $ sync localDb remoteDb { live: true, retry: true }
               updateOneDriveInfoInDbIfNeeded localDb onedriveToken
-              updateUserInfoInDbIfNeeded localDb u
+              globalDb <- liftEff $ newPouchDB globalDbName
+              updateUserInfoInDbIfNeeded globalDb u
               let
                 newState =
                   { onedriveToken
@@ -103,8 +107,9 @@ component =
                   }
               void $ liftEff $ R.transformState this (\_ -> Just newState)) `catchError` handleError
 
-    handleError :: forall e. Error -> Aff (dom :: DOM | e) Unit
-    handleError = const $ liftEff $ redirect "/login"
+    handleError :: forall e. Error -> Aff (dom :: DOM, console :: CONSOLE | e) Unit
+    handleError e =
+      liftEff $ redirect "/login"
 
 
 defaultState :: State
@@ -125,14 +130,14 @@ updateOneDriveInfoInDbIfNeeded db onedriveToken = do
 
 updateUserInfoInDbIfNeeded :: forall e. PouchDB -> UserInfo -> PouchDBAff e Unit
 updateUserInfoInDbIfNeeded db (UserInfo info) = do
-  maybeUserInfo <- tryGetJson db U.userInfoId
+  maybeUserInfo <- tryGetJson db info._id
   case maybeUserInfo of
     Nothing -> do
       let
         newUserInfo =
           U.UserInfo
-          { _id : U.userInfoId
-          , _rev : ""
+          { _id : info._id
+          , _rev : Nothing
           , displayName : info.displayName
           }
       putJson db newUserInfo

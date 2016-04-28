@@ -110,3 +110,10 @@ exports.cancel = function (sync) {
 	return sync.cancel();
     };
 }
+
+
+exports.debugEnable = function (arg) {
+    return function () {
+	return PouchDB.debug.enable(arg);
+    };
+}
