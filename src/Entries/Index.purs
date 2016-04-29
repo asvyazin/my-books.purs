@@ -108,7 +108,8 @@ component =
               void $ liftEff $ R.transformState this (\_ -> Just newState)) `catchError` handleError
 
     handleError :: forall e. Error -> Aff (dom :: DOM, console :: CONSOLE | e) Unit
-    handleError e =
+    handleError e = do
+      liftEff $ log $ message e
       liftEff $ redirect "/login"
 
 

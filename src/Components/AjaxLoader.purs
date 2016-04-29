@@ -1,10 +1,10 @@
 module Components.AjaxLoader where
 
 
-import qualified React as R
-import qualified React.DOM as R
-import qualified React.DOM.Props as RP
-import qualified Thermite as T
+import React (ReactElement, createElement) as R
+import React.DOM (img) as R
+import React.DOM.Props as RP
+import Thermite as T
 
 
 spec :: forall eff state props action. T.Spec eff state props action

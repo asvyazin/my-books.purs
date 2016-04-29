@@ -1,8 +1,8 @@
 module Common.React where
 
 
-import Data.Lens
-import Data.Maybe
+import Data.Lens (view)
+import Data.Maybe (Maybe(..))
 import Prelude
 import Thermite as T
 
