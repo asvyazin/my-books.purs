@@ -2,28 +2,20 @@
 module Main (main) where
 
 
-import Control.Error.Util (hoistMaybe, maybeT)
-import Control.Lens ((^.))
-import Control.Monad.Catch (catch, throwM)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Class (lift)
-import Data.Aeson (toJSON)
-import Data.Maybe (fromJust, maybe)
+import Data.Maybe (fromJust)
 import Data.Monoid ((<>))
 import qualified Data.Text as T (Text, concat, pack)
 import qualified Data.Text.Encoding as T (decodeUtf8)
 import qualified Data.Text.Lazy as TL
 import qualified  Network.HTTP.Client.Conduit as C
-import Network.HTTP.Conduit (HttpException(StatusCodeException))
-import Network.HTTP.Types.Status (unauthorized401)
 import Network.Wai (queryString)
 import qualified Network.Wai.Middleware.Static as Wai
-import Onedrive (OauthTokenRequest(..), oauthTokenRequest, me, OauthTokenResponse(..))
-import Options.Applicative (Parser, switch, long, help, execParser, info, helper, fullDesc)
-import ReactRender (render)
-import ServerEnvironmentInfo (ServerEnvironmentInfo(..))
+import Web.Onedrive (OauthTokenRequest(..), oauthTokenRequest, OauthTokenResponse(..))
+import Common.ServerEnvironmentInfo (ServerEnvironmentInfo(..), getServerEnvironment)
 import System.Directory (getCurrentDirectory)
-import System.Environment (lookupEnv, getExecutablePath)
+import System.Environment (lookupEnv)
 import System.FilePath ((</>))
 import qualified Text.Blaze.Html.Renderer.Text as H (renderHtml)
 import qualified Text.Blaze.Html5 as H (Html,
@@ -43,11 +35,9 @@ import qualified Text.Blaze.Html5 as H (Html,
                                         div,
                                         toValue)
 import qualified Text.Blaze.Html5.Attributes as HA
-import UserInfo (displayName)
 import Web.Spock (runSpock,
                   spockT,
                   get,
-                  cookie,
                   middleware,
                   redirect,
                   html,
@@ -62,11 +52,8 @@ import Web.Spock (runSpock,
 main :: IO ()
 main = do
   port <- getPort
-  onedriveClientId <- getOnedriveClientId
   onedriveClientSecret <- getOnedriveClientSecret
-  appBaseUrl <- getAppBaseUrl
-  couchdbServer <- getCouchdbServer
-  opts <- execParser $ info (helper <*> options) fullDesc
+  serverEnvironment <- getServerEnvironment
   runSpock port $ spockT id $ do
     currentDirectory <- liftIO getCurrentDirectory
     let policy =
@@ -87,8 +74,8 @@ main = do
       let c = pa "code" qs
       let req =
             OauthTokenRequest
-            { clientId = onedriveClientId
-            , redirectUri = appBaseUrl <> "/onedrive-redirect"
+            { clientId = _onedriveClientId serverEnvironment
+            , redirectUri = _appBaseUrl serverEnvironment <> "/onedrive-redirect"
             , clientSecret = onedriveClientSecret
             , code = T.decodeUtf8 $ fromJust c
             }
@@ -97,7 +84,7 @@ main = do
       redirect "/"
 
     get "server-environment" $
-      json $ ServerEnvironmentInfo appBaseUrl onedriveClientId couchdbServer
+      json serverEnvironment
 
     hookAny GET $ \_ ->
       html $ renderHtml appPage
@@ -147,32 +134,6 @@ getPort =
   maybe 8000 read <$> lookupEnv "PORT"
 
 
-getOnedriveClientId :: IO T.Text
-getOnedriveClientId =
-  maybe "000000004816D42C" T.pack <$> lookupEnv "ONEDRIVE_CLIENT_ID"
-
-
 getOnedriveClientSecret :: IO T.Text
 getOnedriveClientSecret =
   maybe "-4tKnVPaAyIEAgYrBp8R6jTYY0zClN6c" T.pack <$> lookupEnv "ONEDRIVE_CLIENT_SECRET"
-
-
-getAppBaseUrl :: IO T.Text
-getAppBaseUrl =
-  maybe "http://localhost:8000" T.pack <$> lookupEnv "APP_BASE_URL"
-
-
-getCouchdbServer :: IO T.Text
-getCouchdbServer =
-  maybe "http://localhost:5984" T.pack <$> lookupEnv "COUCHDB_SERVER"
-
-
-data Options =
-  Options
-  { serverSideRendering :: Bool
-  } deriving (Show)
-
-
-options :: Parser Options
-options =
-  Options <$> switch (long "server-side-rendering" <> help "Enables server-side react rendering")

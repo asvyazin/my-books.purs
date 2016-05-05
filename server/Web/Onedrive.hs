@@ -1,20 +1,19 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Onedrive where
+{-# LANGUAGE FlexibleContexts #-}
+module Web.Onedrive where
 
 
+import Common.JSONHelper (jsonParser)
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Reader.Class (MonadReader)
-import Data.Aeson (json')
+import Control.Monad.Trans.Control (MonadBaseControl)
 import Data.Aeson.Types (FromJSON,
                          parseJSON,
                          Value(String, Object),
                          typeMismatch,
                          (.:),
-                         (.:?),
-                         fromJSON,
-                         Result(Success, Error))
-import qualified Data.Attoparsec.ByteString as A
+                         (.:?))
 import qualified Data.ByteString as B
 import Data.Conduit (($$))
 import Data.Conduit.Attoparsec (sinkParser)
@@ -27,10 +26,9 @@ import Network.HTTP.Client.Conduit (HasHttpManager
                                    , RequestBody (RequestBodyBS)
                                    , requestHeaders
                                    , responseBody
-                                   , responseOpen)
+                                   , withResponse)
 import Network.HTTP.Types.Header (hContentType, hAuthorization)
 import Network.HTTP.Types.URI (renderQuery)
-import UserInfo (UserInfo, userInfoParser)
 
 
 data OauthTokenRequest =
@@ -91,17 +89,7 @@ serializeRequest req =
       renderQuery False qqsParams
 
 
-oauthTokenResponseParser :: A.Parser OauthTokenResponse
-oauthTokenResponseParser = do
-  v <- json'
-  case fromJSON v of
-    Success r ->
-      return r
-    Error e ->
-      fail e
-
-
-oauthTokenRequest :: (MonadThrow m, MonadIO m, MonadReader env m, HasHttpManager env) => OauthTokenRequest -> m OauthTokenResponse
+oauthTokenRequest :: (MonadThrow m, MonadIO m, MonadReader env m, HasHttpManager env, MonadBaseControl IO m) => OauthTokenRequest -> m OauthTokenResponse
 oauthTokenRequest req = do
   initReq <- parseUrl "https://login.live.com/oauth20_token.srf"
   let
@@ -111,15 +99,32 @@ oauthTokenRequest req = do
       , requestBody = RequestBodyBS (serializeRequest req)
       , requestHeaders = [(hContentType, "application/x-www-form-urlencoded")]
       }
-  httpResp <- responseOpen httpReq
-  responseBody httpResp $$ sinkParser oauthTokenResponseParser
+  withResponse httpReq $ \resp ->
+    responseBody resp $$ sinkParser jsonParser
 
 
-me :: (MonadThrow m, MonadIO m, MonadReader env m, HasHttpManager env) => T.Text -> m UserInfo
+me :: (MonadThrow m, MonadIO m, MonadReader env m, HasHttpManager env, MonadBaseControl IO m) => T.Text -> m UserInfo
 me token = do
   initReq <- parseUrl "https://apis.live.net/v5.0/me"
   let
     httpReq =
       initReq { requestHeaders = [(hAuthorization, T.encodeUtf8 ("Bearer " `T.append` token))] }
-  httpResp <- responseOpen httpReq
-  responseBody httpResp $$ sinkParser userInfoParser
+  withResponse httpReq $ \resp ->
+    responseBody resp $$ sinkParser jsonParser
+
+
+data UserInfo =
+  UserInfo
+  { __id :: T.Text
+  , _displayName :: T.Text
+  } deriving (Eq, Show)
+
+
+instance FromJSON UserInfo where
+  parseJSON (Object o) =
+    UserInfo
+    <$> o .: "id"
+    <*> o .: "name"
+
+  parseJSON invalid =
+    typeMismatch "UserInfo" invalid

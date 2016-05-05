@@ -1,13 +1,22 @@
 {-# LANGUAGE OverloadedStrings #-}
-module ReactRender where
+module Web.ReactRender where
 
 
-import Control.Monad
-import Control.Monad.IO.Class
-import Data.Aeson
-import Scripting.Duktape
-import Scripting.Duktape.Raw
-import Text.Blaze
+import Control.Monad (when, void, guard, forM_)
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import Data.Aeson (Value)
+import Scripting.Duktape (pushValue)
+import Scripting.Duktape.Raw (CDukContext,
+                              dukIsError,
+                              dukGetPropString,
+                              dukSafeToLString,
+                              dukCreateHeapDefault,
+                              dukPEvalFileNoResult,
+                              dukPEvalFile,
+                              dukPcall,
+                              dukGetString,
+                              dukPop)
+import Text.Blaze (Markup, preEscapedToMarkup)
 
 
 hsResult :: (MonadIO m) => CDukContext -> m Int -> m ()

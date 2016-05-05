@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module UserInfo where
+module Web.UserInfo where
 
 
 import Control.Lens (Lens', lens)
@@ -14,16 +14,6 @@ data UserInfo =
   { __id :: T.Text
   , _displayName :: T.Text
   } deriving (Eq, Show)
-
-
-_id :: Lens' UserInfo T.Text
-_id =
-  lens __id (\u x -> u { __id = x })
-
-
-displayName :: Lens' UserInfo T.Text
-displayName =
-  lens _displayName (\u x -> u { _displayName = x })
 
 
 instance FromJSON UserInfo where
@@ -44,3 +34,13 @@ userInfoParser = do
       return r
     Error e ->
       fail e
+
+
+_id :: Lens' UserInfo T.Text
+_id =
+  lens __id (\u x -> u { __id = x })
+
+
+displayName :: Lens' UserInfo T.Text
+displayName =
+  lens _displayName (\u x -> u { _displayName = x })

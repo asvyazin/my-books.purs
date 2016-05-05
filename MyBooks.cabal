@@ -13,11 +13,11 @@ build-type:          Simple
 cabal-version:       >=1.10
 
 executable MyBooks
-  main-is:             Main.hs
-  other-modules:       Onedrive,
-                       UserInfo,
-                       ReactRender,
-                       ServerEnvironmentInfo
+  main-is:             Web/Main.hs
+  other-modules:       Web.Onedrive,
+                       Web.ReactRender,
+                       Common.ServerEnvironmentInfo,
+                       Common.JSONHelper
   -- other-extensions:    
   build-depends:       base,
                        Spock,
@@ -42,12 +42,32 @@ executable MyBooks
                        errors,
                        directory,
                        filepath,
-                       optparse-applicative
+                       optparse-applicative,
+                       monad-control
   hs-source-dirs:      server
   default-language:    Haskell2010
 
 executable BookIndexer
-           main-is: Main.hs
-           build-depends:       base
-           hs-source-dirs:      server/BookIndexer
+           main-is:             BookIndexer/Main.hs
+           other-modules:       BookIndexer.CouchDB.Changes.Watcher,
+                                Common.UserInfo,
+                                Common.JSONHelper,
+                                Common.ServerEnvironmentInfo
+           build-depends:       base,
+                                http-conduit,
+                                aeson,
+                                conduit,
+                                blaze-builder,
+                                bytestring,
+                                conduit-extra,
+                                text,
+                                http-types,
+                                attoparsec,
+                                exceptions,
+                                mtl,
+                                transformers,
+                                async,
+                                monad-control,
+                                conduit-combinators
+           hs-source-dirs:      server
            default-language:    Haskell2010
