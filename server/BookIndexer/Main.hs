@@ -14,6 +14,7 @@ import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (runReaderT)
 import Control.Monad.Reader.Class (MonadReader, ask)
 import Control.Monad.Trans.Control (MonadBaseControl)
+import Control.Monad.Trans.Resource (runResourceT)
 import Data.Aeson (FromJSON(parseJSON), Value(Object), (.:), ToJSON(toJSON), (.=), object)
 import Data.Conduit (($$), (=$=))
 import Data.Conduit.Attoparsec (sinkParser)
@@ -133,7 +134,7 @@ watchNewUsersLoop couchdbServer lastSeq = do
     watchNewUsersLoop' = do
       liftIO $ putStrLn "starting watching"
       watchChanges watchParams =$= DC.mapM (getUserInfo couchdbServer) =$= DC.mapM_ processUser $$ DC.last
-  liftIO $ withAsync (runReaderT watchNewUsersLoop' httpEnv) wait
+  liftIO $ withAsync (runReaderT (runResourceT watchNewUsersLoop') httpEnv) wait
 
 
 usersFilter :: Text

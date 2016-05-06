@@ -5,12 +5,14 @@ module BookIndexer.CouchDB.Changes.Watcher where
 
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class (MonadIO)
-import Control.Monad.Reader.Class (MonadReader)
+import Control.Monad.Reader (runReaderT)
+import Control.Monad.Reader.Class (MonadReader(ask))
+import Control.Monad.Trans.Resource (MonadResource)
 import Blaze.ByteString.Builder (toByteString)
 import Data.Aeson (FromJSON(parseJSON), Value(Object), (.:), (.:?), json', fromJSON, Result(Success, Error))
 import Data.Attoparsec.ByteString.Char8 (Parser, endOfLine)
 import Data.ByteString.Char8 (pack, unpack)
-import Data.Conduit (Source, (=$=))
+import Data.Conduit (Source, (=$=), bracketP)
 import Data.Conduit.Attoparsec (conduitParser)
 import qualified Data.Conduit.List as CL (map)
 import Data.Int (Int64)
@@ -19,10 +21,10 @@ import Data.Monoid ((<>))
 import Data.Text (Text)
 import Data.Text.Encoding (encodeUtf8)
 import Network.HTTP.Types.URI (renderQuery, encodePathSegments)
-import Network.HTTP.Client.Conduit (parseUrl, responseBody, HasHttpManager, responseOpen)
+import Network.HTTP.Client.Conduit (parseUrl, responseBody, HasHttpManager, responseOpen, responseClose)
 
 
-watchChanges :: (MonadThrow m, MonadReader env m, HasHttpManager env, MonadIO m) => WatchParams -> Source m DocumentChange
+watchChanges :: (MonadThrow m, MonadReader env m, HasHttpManager env, MonadIO m, MonadResource m) => WatchParams -> Source m DocumentChange
 watchChanges params = do
   let
     sinceParam i64 =
@@ -44,8 +46,17 @@ watchChanges params = do
       encodeUtf8 (_baseUrl params) <> toByteString (encodePathSegments [_database params, "_changes"]) <> qs
 
   req <- parseUrl $ unpack url
-  resp <- responseOpen req
-  responseBody resp =$= conduitParser changesParser =$= CL.map snd
+  withResponse' req $ \resp ->
+    responseBody resp =$= conduitParser changesParser =$= CL.map snd
+  where
+    withResponse' req func = do
+      httpEnv <- ask
+      let
+        responseOpen' =
+          runReaderT (responseOpen req) httpEnv
+        responseClose' resp =
+          runReaderT (responseClose resp) httpEnv
+      bracketP responseOpen' responseClose' func
 
 
 data WatchParams =
