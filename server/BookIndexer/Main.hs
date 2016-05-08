@@ -1,20 +1,23 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TemplateHaskell #-}
 module Main (main) where
 
 
 import BookIndexer.CouchDB.Changes.Watcher (watchChanges, WatchParams(..), DocumentChange, _seq)
+import BookIndexer.Environment (Environment(Environment), manager, serverEnvironment)
+import BookIndexer.IndexerState (IndexerState(IndexerState), rev, lastSeq, indexerStateId)
 import qualified BookIndexer.CouchDB.Changes.Watcher as W (_id)
+import Common.Database (usersDatabaseName, indexerDatabaseName, userDatabaseName)
+import Common.HTTPHelper (textUrlEncode)
 import Common.JSONHelper (jsonParser)
-import Common.OnedriveInfo (OnedriveInfo, onedriveInfoId)
+import Common.OnedriveInfo (OnedriveInfo, onedriveInfoId, getOnedriveInfo)
 import Common.ServerEnvironmentInfo (getServerEnvironment, ServerEnvironmentInfo, couchdbServer)
 import Common.UserInfo (UserInfo)
 import qualified Common.UserInfo as U (_id)
 import Control.Concurrent.Async (Async, async)
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TVar (newTVar, modifyTVar, TVar)
-import Control.Lens ((^.), makeLenses, view)
+import Control.Lens ((^.), view, set)
 import Control.Monad (void, (=<<))
 import Control.Monad.Base (MonadBase(liftBase))
 import Control.Monad.Catch (MonadThrow(throwM), MonadCatch(catch))
@@ -42,20 +45,6 @@ type UserSynchronizers =
   TVar [Async ()]
 
 
-data Environment =
-  Environment
-  { _httpManager :: Manager
-  , _serverEnvironment :: ServerEnvironmentInfo
-  }
-
-
-makeLenses ''Environment
-
-
-instance HasHttpManager Environment where
-  getHttpManager = _httpManager
-
-
 main :: IO ()
 main = do
   serverEnv <- getServerEnvironment
@@ -66,8 +55,8 @@ main = do
   withManager $ withReaderT convertEnvironment $ do
     state <- getIndexerState
     let
-      lastSeq = _lastSeq <$> state
-    maybeNewLastSeq <- watchNewUsersLoop userSynchronizers lastSeq
+      ls = view lastSeq <$> state
+    maybeNewLastSeq <- watchNewUsersLoop userSynchronizers ls
     case maybeNewLastSeq of
       Nothing ->
         return ()
@@ -77,7 +66,7 @@ main = do
 
 getIndexerState :: (MonadCatch m, MonadIO m, MonadReader Environment m, MonadBaseControl IO m) => m (Maybe IndexerState)
 getIndexerState = do
-  req <- parseRequest =<< indexerStateUrl
+  req <- parseRequest =<< getObjectUrl indexerDatabaseName indexerStateId
   withResponse req processResponse `catch` handleError
   where
     processResponse resp =
@@ -93,66 +82,16 @@ getIndexerState = do
 
 setIndexerState :: (MonadThrow m, MonadIO m, MonadReader Environment m) => IndexerState -> m ()
 setIndexerState indexerState = do
-  initReq <- parseRequest =<< indexerStateUrl
+  initReq <- parseRequest =<< getObjectUrl indexerDatabaseName indexerStateId
   let
     req =
       setRequestMethod "PUT" $ setRequestBodyJSON indexerState initReq
   void $ httpNoBody req
 
 
-indexerStateUrl :: MonadReader Environment m => m String
-indexerStateUrl = do
-  couchdbUrl <- view (serverEnvironment . couchdbServer)
-  return $ unpack $ couchdbUrl <> "/" <> indexerDatabaseName <> "/" <> indexerStateId
-
-
-indexerStateId :: Text
-indexerStateId =
-  "indexerState"
-
-
-indexerDatabaseName :: Text
-indexerDatabaseName =
-  "my-books-indexer"
-
-
-usersDatabaseName :: Text
-usersDatabaseName =
-  "my-books"
-
-
-data IndexerState =
-  IndexerState
-  { __rev :: Maybe String
-  , _lastSeq :: Int64
-  }
-
-
-instance FromJSON IndexerState where
-  parseJSON (Object v) =
-    IndexerState <$> v .: "_rev" <*> v .: "last_seq"
-  parseJSON _ =
-    error "Invalid IndexerState JSON"
-
-
-instance ToJSON IndexerState where
-  toJSON indexerState =
-    let 
-      state =
-        [ Just ("_id" .= indexerStateId)
-        , formatRev <$> __rev indexerState
-        , Just ("last_seq" .= _lastSeq indexerState)
-        ]
-      
-      formatRev str =
-        "_rev" .= str
-    in
-      object $ catMaybes state
-
-
 newIndexerState :: Maybe IndexerState -> Int64 -> IndexerState
-newIndexerState current lastSeq =
-  maybe (IndexerState Nothing lastSeq) (\s -> s { _lastSeq = lastSeq }) current
+newIndexerState current ls =
+  maybe (IndexerState Nothing ls) (set lastSeq ls) current
 
   
 watchNewUsersLoop :: (MonadReader Environment m, MonadThrow m, MonadIO m, MonadBase IO m, MonadBaseControl IO m) => UserSynchronizers -> Maybe Int64 -> m (Maybe Int64)
@@ -207,22 +146,6 @@ processUser userSynchronizers userInfo = do
 
 synchronizeUserLoop :: (MonadBase IO m, MonadThrow m, MonadIO m, MonadReader Environment m, MonadBaseControl IO m) => UserInfo -> m ()
 synchronizeUserLoop userInfo = do
-  onedriveInfo <- getOnedriveInfo (userInfo ^. U._id)
+  couchdbUrl <- view (serverEnvironment . couchdbServer)
+  onedriveInfo <- getOnedriveInfo couchdbUrl $ userDatabaseName $ userInfo ^. U._id
   liftBase $ print onedriveInfo
-
-
-getOnedriveInfo :: (MonadThrow m, MonadIO m, MonadReader Environment m, MonadBaseControl IO m) => Text -> m OnedriveInfo
-getOnedriveInfo userId = do
-  req <- parseRequest =<< getObjectUrl (userDatabaseName userId) onedriveInfoId
-  withResponse req $ \resp ->
-    responseBody resp $$ sinkParser jsonParser
-
-
-userDatabaseName :: Text -> Text
-userDatabaseName userId =
-  textUrlEncode $ usersDatabaseName <> "/" <> userId
-
-
-textUrlEncode :: Text -> Text
-textUrlEncode =
-  decodeUtf8 . urlEncode False . encodeUtf8

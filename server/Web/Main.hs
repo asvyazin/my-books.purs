@@ -1,19 +1,29 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Main (main) where
 
 
-import Control.Monad.IO.Class (liftIO)
+import Common.Database (userDatabaseName)
+import Common.OnedriveInfo (getOnedriveInfo, setOnedriveInfo, token, refreshToken)
+import Common.ServerEnvironmentInfo (ServerEnvironmentInfo(..), getServerEnvironment)
+import Control.Concurrent (forkIO)
+import Control.Lens ((^.), set)
+import Control.Monad (when, void)
+import Control.Monad.Catch (MonadThrow)
+import Control.Monad.IO.Class (MonadIO(liftIO))
+import Control.Monad.Reader.Class (MonadReader)
 import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.Control (MonadBaseControl)
 import Data.Maybe (fromJust)
 import Data.Monoid ((<>))
 import qualified Data.Text as T (Text, concat, pack)
 import qualified Data.Text.Encoding as T (decodeUtf8)
 import qualified Data.Text.Lazy as TL
-import qualified  Network.HTTP.Client.Conduit as C
+import Network.HTTP.Client.Conduit (withManager, HasHttpManager)
 import Network.Wai (queryString)
 import qualified Network.Wai.Middleware.Static as Wai
-import Web.Onedrive (OauthTokenRequest(..), oauthTokenRequest, OauthTokenResponse(..))
-import Common.ServerEnvironmentInfo (ServerEnvironmentInfo(..), getServerEnvironment)
+import Web.Onedrive (OauthTokenRequest(..), oauthTokenRequest, OauthTokenResponse(..), me)
+import qualified Web.Onedrive as OD (UserInfo(..))
 import System.Directory (getCurrentDirectory)
 import System.Environment (lookupEnv)
 import System.FilePath ((</>))
@@ -79,8 +89,9 @@ main = do
             , clientSecret = onedriveClientSecret
             , code = T.decodeUtf8 $ fromJust c
             }
-      tokenResp <- lift $ C.withManager $ oauthTokenRequest req
-      setCookie "onedriveToken" (accessToken tokenResp) defaultCookieSettings
+      resp <- lift $ withManager $ oauthTokenRequest req
+      void $ liftIO $ forkIO $ updateOnedriveInfoSync (_couchdbServer serverEnvironment) resp
+      setCookie "onedriveToken" (accessToken resp) defaultCookieSettings
       redirect "/"
 
     get "server-environment" $
@@ -137,3 +148,25 @@ getPort =
 getOnedriveClientSecret :: IO T.Text
 getOnedriveClientSecret =
   maybe "-4tKnVPaAyIEAgYrBp8R6jTYY0zClN6c" T.pack <$> lookupEnv "ONEDRIVE_CLIENT_SECRET"
+
+
+updateOnedriveInfoSync :: T.Text -> OauthTokenResponse -> IO ()
+updateOnedriveInfoSync couchdbUrl resp = do
+  let
+    tok = accessToken resp
+  withManager $ do
+    user <- me tok
+    updateOnedriveInfoIfNeeded couchdbUrl (OD.__id user) resp
+
+
+updateOnedriveInfoIfNeeded :: (MonadReader env m, HasHttpManager env, MonadThrow m, MonadBaseControl IO m, MonadIO m) => T.Text -> T.Text -> OauthTokenResponse -> m ()
+updateOnedriveInfoIfNeeded couchdbUrl userId tokenResp = do
+  let
+    databaseId = userDatabaseName userId
+    newToken = accessToken tokenResp
+    newRefreshToken = Web.Onedrive.refreshToken tokenResp
+  currentInfo <- getOnedriveInfo couchdbUrl databaseId
+  when ((currentInfo ^. token) /= newToken || (currentInfo ^. Common.OnedriveInfo.refreshToken) /= newRefreshToken) $ do
+    let
+      newInfo = set Common.OnedriveInfo.refreshToken newRefreshToken $ set token newToken currentInfo
+    setOnedriveInfo couchdbUrl databaseId newInfo

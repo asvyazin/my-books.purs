@@ -1,7 +1,6 @@
 module Entries.Index where
 
 
-import Common.Data.OnedriveInfo (OnedriveInfo(..), defaultOnedriveInfo, onedriveInfoId)
 import Common.Data.ServerEnvironmentInfo (ServerEnvironmentInfo(..), getServerEnvironment)
 import Common.Data.UserInfo as U
 import Common.OneDriveApi (getUserInfo, UserInfo(UserInfo))
@@ -17,7 +16,7 @@ import Control.Monad.Eff.Console (log, CONSOLE)
 import Control.Monad.Eff.Exception (EXCEPTION, Error, message)
 import Control.Monad.Error.Class (catchError)
 import Data.Foldable (fold)
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(Just, Nothing))
 import DOM (DOM)
 import DOM.HTML (window)
 import DOM.HTML.Location (setHref)
@@ -96,7 +95,6 @@ component =
               localDb <- liftEff $ newPouchDB dbName
               remoteDb <- liftEff $ newPouchDB remoteDbName
               void $ liftEff $ sync localDb remoteDb { live: true, retry: true }
-              updateOneDriveInfoInDbIfNeeded localDb onedriveToken
               globalDb <- liftEff $ newPouchDB globalDbName
               updateUserInfoInDbIfNeeded globalDb u
               let
@@ -121,12 +119,6 @@ defaultState =
 redirect :: forall e. String -> Eff (dom :: DOM | e) Unit
 redirect url =
   void $ window >>= location >>= setHref url
-
-
-updateOneDriveInfoInDbIfNeeded :: forall e. PouchDB -> String -> PouchDBAff e Unit
-updateOneDriveInfoInDbIfNeeded db onedriveToken = do
-  OnedriveInfo onedriveInfo <- fromMaybe defaultOnedriveInfo <$> tryGetJson db onedriveInfoId
-  when (onedriveInfo.token /= Just onedriveToken) $ putJson db $ OnedriveInfo $ onedriveInfo { token = Just onedriveToken }
 
 
 updateUserInfoInDbIfNeeded :: forall e. PouchDB -> UserInfo -> PouchDBAff e Unit

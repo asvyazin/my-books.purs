@@ -72,7 +72,7 @@ loginButton =
 
     loginParams state =
       [ (Tuple "client_id" state.clientId)
-      , (Tuple "scope" "wl.signin onedrive.readonly")
+      , (Tuple "scope" "wl.signin wl.offline_access onedrive.readonly")
       , (Tuple "response_type" "code")
       , (Tuple "redirect_uri" (state.appBaseUrl <> "/onedrive-redirect"))
       ]
