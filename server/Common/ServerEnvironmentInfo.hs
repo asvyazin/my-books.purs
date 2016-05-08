@@ -1,7 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Common.ServerEnvironmentInfo where
 
 
+import Control.Lens (makeLenses)
 import Data.Aeson (ToJSON(toJSON), object, (.=))
 import qualified Data.Text as T
 import System.Environment (lookupEnv)
@@ -13,6 +15,9 @@ data ServerEnvironmentInfo =
   , _onedriveClientId :: T.Text
   , _couchdbServer :: T.Text
   }
+
+
+makeLenses ''ServerEnvironmentInfo
 
 
 instance ToJSON ServerEnvironmentInfo where

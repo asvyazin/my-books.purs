@@ -1,8 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TemplateHaskell #-}
 module BookIndexer.CouchDB.Changes.Watcher where
 
 
+import Control.Lens (makeLenses)
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Reader (runReaderT)
@@ -70,8 +72,8 @@ data WatchParams =
 
 data DocumentChange =
   DocumentChange
-  { _seq :: Int64
-  , _id :: Text
+  { __seq :: Int64
+  , __id :: Text
   , _changes :: [Change]
   } deriving (Show)
 
@@ -107,3 +109,7 @@ changesParser = do
       return r
     Error e ->
       fail e
+
+
+makeLenses ''DocumentChange
+makeLenses ''Change
