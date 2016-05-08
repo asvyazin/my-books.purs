@@ -7,18 +7,17 @@ import BookIndexer.CouchDB.Changes.Watcher (watchChanges, WatchParams(..), Docum
 import Common.JSONHelper (jsonParser)
 import Common.ServerEnvironmentInfo (getServerEnvironment, ServerEnvironmentInfo(..))
 import Common.UserInfo (UserInfo)
-import Control.Concurrent.Async (withAsync, wait)
 import Control.Monad (void)
+import Control.Monad.Base (MonadBase(liftBase))
 import Control.Monad.Catch (MonadThrow(throwM), MonadCatch(catch))
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.Reader (runReaderT)
-import Control.Monad.Reader.Class (MonadReader, ask)
+import Control.Monad.IO.Class (MonadIO)
+import Control.Monad.Reader.Class (MonadReader)
 import Control.Monad.Trans.Control (MonadBaseControl)
 import Control.Monad.Trans.Resource (runResourceT)
 import Data.Aeson (FromJSON(parseJSON), Value(Object), (.:), ToJSON(toJSON), (.=), object)
-import Data.Conduit (($$), (=$=))
+import Data.Conduit (($$), (=$=), Sink, passthroughSink)
 import Data.Conduit.Attoparsec (sinkParser)
-import qualified Data.Conduit.Combinators as DC (last, mapM_, mapM)
+import qualified Data.Conduit.Combinators as DC (last, map, mapM, mapM_)
 import Data.Int (Int64)
 import Data.Maybe (catMaybes)
 import Data.Monoid ((<>))
@@ -120,9 +119,8 @@ newIndexerState current lastSeq =
   maybe (IndexerState Nothing lastSeq) (\s -> s { _lastSeq = lastSeq }) current
 
 
-watchNewUsersLoop :: (MonadReader env m, HasHttpManager env, MonadIO m) => Text -> Maybe Int64 -> m (Maybe Int64)
+watchNewUsersLoop :: (MonadReader env m, HasHttpManager env, MonadThrow m, MonadIO m, MonadBase IO m, MonadBaseControl IO m) => Text -> Maybe Int64 -> m (Maybe Int64)
 watchNewUsersLoop couchdbServer lastSeq = do
-  httpEnv <- ask
   let
     watchParams =
       WatchParams
@@ -131,10 +129,9 @@ watchNewUsersLoop couchdbServer lastSeq = do
       , _since = lastSeq
       , _filter = Just usersFilter
       }
-    watchNewUsersLoop' = do
-      liftIO $ putStrLn "starting watching"
-      watchChanges watchParams =$= DC.mapM (getUserInfo couchdbServer) =$= DC.mapM_ processUser $$ DC.last
-  liftIO $ withAsync (runReaderT (runResourceT watchNewUsersLoop') httpEnv) wait
+    watchNewUsersLoop' =
+      watchChanges watchParams =$= passthroughSink (processDocumentChange couchdbServer) return =$= DC.map _seq $$ DC.last -- TODO: catch exceptions
+  runResourceT watchNewUsersLoop'
 
 
 usersFilter :: Text
@@ -142,16 +139,21 @@ usersFilter =
   "users/all"
 
 
-getUserInfo :: (MonadIO m, MonadReader env m, HasHttpManager env, MonadThrow m, MonadBaseControl IO m) => Text -> DocumentChange -> m UserInfo
-getUserInfo couchdbUrl documentChange = do
-  liftIO $ print documentChange
+processDocumentChange :: (MonadIO m, MonadReader env m, HasHttpManager env, MonadThrow m, MonadBaseControl IO m) => Text -> Sink DocumentChange m ()
+processDocumentChange couchdbServer =
+  DC.mapM (getUserInfo couchdbServer) =$= DC.mapM_ processUser
+
+
+getUserInfo :: (MonadIO m, MonadBase IO m, MonadReader env m, HasHttpManager env, MonadThrow m, MonadBaseControl IO m) => Text -> DocumentChange -> m UserInfo
+getUserInfo couchdbServer documentChange = do
+  liftBase $ print documentChange
   let
     docId = _id documentChange
-  req <- parseRequest $ unpack $ couchdbUrl <> "/" <> usersDatabaseName <> "/" <> docId
+  req <- parseRequest $ unpack $ couchdbServer <> "/" <> usersDatabaseName <> "/" <> docId
   withResponse req $ \resp ->
     responseBody resp $$ sinkParser jsonParser
   
 
-processUser :: (MonadIO m) => UserInfo -> m ()
+processUser :: (MonadBase IO m) => UserInfo -> m ()
 processUser userInfo =
-  liftIO $ print userInfo
+  liftBase $ print userInfo

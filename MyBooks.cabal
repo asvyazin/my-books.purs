@@ -69,6 +69,7 @@ executable BookIndexer
                                 async,
                                 monad-control,
                                 conduit-combinators,
-                                resourcet
+                                resourcet,
+                                transformers-base
            hs-source-dirs:      server
            default-language:    Haskell2010
