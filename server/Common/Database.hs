@@ -20,3 +20,8 @@ userDatabaseName userId =
 indexerDatabaseName :: Text
 indexerDatabaseName =
   "my-books-indexer"
+
+
+usersFilter :: Text
+usersFilter =
+  "users/all"

@@ -53,6 +53,7 @@ executable BookIndexer
            other-modules:       BookIndexer.CouchDB.Changes.Watcher,
                                 BookIndexer.Environment,
                                 BookIndexer.IndexerState,
+                                Common.BooksDirectoryInfo,
                                 Common.Database,
                                 Common.HTTPHelper,
                                 Common.JSONHelper,

@@ -7,7 +7,8 @@ import BookIndexer.CouchDB.Changes.Watcher (watchChanges, WatchParams(..), Docum
 import BookIndexer.Environment (Environment(Environment), manager, serverEnvironment)
 import BookIndexer.IndexerState (IndexerState(IndexerState), rev, lastSeq, indexerStateId)
 import qualified BookIndexer.CouchDB.Changes.Watcher as W (_id)
-import Common.Database (usersDatabaseName, indexerDatabaseName, userDatabaseName)
+import Common.BooksDirectoryInfo (getBooksDirectoryInfo)
+import Common.Database (usersDatabaseName, indexerDatabaseName, userDatabaseName, usersFilter)
 import Common.HTTPHelper (textUrlEncode)
 import Common.JSONHelper (jsonParser)
 import Common.OnedriveInfo (OnedriveInfo, onedriveInfoId, getOnedriveInfo)
@@ -110,11 +111,6 @@ watchNewUsersLoop userSynchronizers lastSeq = do
   runResourceT watchNewUsersLoop'
 
 
-usersFilter :: Text
-usersFilter =
-  "users/all"
-
-
 processDocumentChange :: (MonadIO m, MonadReader Environment m, MonadThrow m, MonadBaseControl IO m) => UserSynchronizers -> Sink DocumentChange m ()
 processDocumentChange userSynchronizers =
   DC.mapM getUserInfo =$= DC.mapM_ (processUser userSynchronizers)
@@ -147,5 +143,10 @@ processUser userSynchronizers userInfo = do
 synchronizeUserLoop :: (MonadBase IO m, MonadThrow m, MonadIO m, MonadReader Environment m, MonadBaseControl IO m) => UserInfo -> m ()
 synchronizeUserLoop userInfo = do
   couchdbUrl <- view (serverEnvironment . couchdbServer)
-  onedriveInfo <- getOnedriveInfo couchdbUrl $ userDatabaseName $ userInfo ^. U._id
+  let
+    userDatabaseId =
+      userDatabaseName $ userInfo ^. U._id
+  onedriveInfo <- getOnedriveInfo couchdbUrl userDatabaseId
   liftBase $ print onedriveInfo
+  booksDirectoryInfo <- getBooksDirectoryInfo couchdbUrl userDatabaseId
+  liftBase $ print booksDirectoryInfo
