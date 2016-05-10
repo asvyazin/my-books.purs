@@ -4,14 +4,15 @@ module Main (main) where
 
 
 import BookIndexer.CouchDB.Changes.Watcher (watchChanges, WatchParams(..), DocumentChange, _seq)
+import qualified BookIndexer.CouchDB.Changes.Watcher as W (_id)
 import BookIndexer.Environment (Environment(Environment), manager, serverEnvironment)
 import BookIndexer.IndexerState (IndexerState(IndexerState), rev, lastSeq, indexerStateId)
-import qualified BookIndexer.CouchDB.Changes.Watcher as W (_id)
-import Common.BooksDirectoryInfo (getBooksDirectoryInfo)
+import BookIndexer.Onedrive.FolderChangesReader (FolderChangesReader, newFolderChangesReader, enumerateChanges)
+import Common.BooksDirectoryInfo (getBooksDirectoryInfo, booksItemId)
 import Common.Database (usersDatabaseName, indexerDatabaseName, userDatabaseName, usersFilter)
 import Common.HTTPHelper (textUrlEncode)
 import Common.JSONHelper (jsonParser)
-import Common.OnedriveInfo (OnedriveInfo, onedriveInfoId, getOnedriveInfo)
+import Common.OnedriveInfo (OnedriveInfo, onedriveInfoId, getOnedriveInfo, token)
 import Common.ServerEnvironmentInfo (getServerEnvironment, ServerEnvironmentInfo, couchdbServer)
 import Common.UserInfo (UserInfo)
 import qualified Common.UserInfo as U (_id)
@@ -19,10 +20,10 @@ import Control.Concurrent.Async (Async, async)
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TVar (newTVar, modifyTVar, TVar)
 import Control.Lens ((^.), view, set)
-import Control.Monad (void, (=<<))
+import Control.Monad (void, (=<<), when)
 import Control.Monad.Base (MonadBase(liftBase))
 import Control.Monad.Catch (MonadThrow(throwM), MonadCatch(catch))
-import Control.Monad.IO.Class (MonadIO)
+import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Reader (runReaderT, withReaderT)
 import Control.Monad.Reader.Class (MonadReader(ask))
 import Control.Monad.Trans.Control (MonadBaseControl)
@@ -38,7 +39,7 @@ import Data.Text (Text, unpack)
 import Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import Network.HTTP.Client.Conduit (withResponse, responseBody, HasHttpManager(getHttpManager), withManager, httpNoBody, HttpException(StatusCodeException), Manager)
 import Network.HTTP.Simple (setRequestMethod, setRequestBodyJSON, parseRequest)
-import Network.HTTP.Types.Status (notFound404)
+import Network.HTTP.Types.Status (notFound404, unauthorized401)
 import Network.HTTP.Types.URI (urlEncode)
 
 
@@ -140,7 +141,7 @@ processUser userSynchronizers userInfo = do
   liftBase $ atomically $ modifyTVar userSynchronizers (synchronizer :)
 
 
-synchronizeUserLoop :: (MonadBase IO m, MonadThrow m, MonadIO m, MonadReader Environment m, MonadBaseControl IO m) => UserInfo -> m ()
+synchronizeUserLoop :: (MonadBase IO m, MonadCatch m, MonadIO m, MonadReader Environment m, MonadBaseControl IO m) => UserInfo -> m ()
 synchronizeUserLoop userInfo = do
   couchdbUrl <- view (serverEnvironment . couchdbServer)
   let
@@ -150,3 +151,28 @@ synchronizeUserLoop userInfo = do
   liftBase $ print onedriveInfo
   booksDirectoryInfo <- getBooksDirectoryInfo couchdbUrl userDatabaseId
   liftBase $ print booksDirectoryInfo
+  onedriveReader <- newFolderChangesReader (onedriveInfo ^. token) (booksDirectoryInfo ^. booksItemId) Nothing
+  (enumerateChanges onedriveReader $$ DC.mapM_ (liftIO . print)) `catch` handleError
+  where
+    handleError :: (MonadThrow m, MonadIO m) => HttpException -> m ()
+    handleError e =
+      liftIO $ print e -- TODO proper handling, use reauthorizeLoop below
+
+
+reauthorizeLoop :: (MonadCatch m) => (a -> m ()) -> (a -> m a) -> a -> m ()
+reauthorizeLoop worker reauthorizeHandler context = do
+  needReauthorize <- iteration
+  when needReauthorize $ do
+    newContext <- reauthorizeHandler context
+    reauthorizeLoop worker reauthorizeHandler context
+  where
+    iteration =
+      (worker context >> return False) `catch` handleError
+    handleError :: (MonadThrow m) => HttpException -> m Bool
+    handleError e@(StatusCodeException statusCode _ _ )
+      | statusCode == unauthorized401 =
+        return True
+      | otherwise =
+        throwM e
+    handleError e =
+      throwM e
