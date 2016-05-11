@@ -14,10 +14,10 @@ cabal-version:       >=1.10
 
 executable MyBooks
   main-is:             Web/Main.hs
-  other-modules:       Web.Onedrive,
-                       Common.Database,
+  other-modules:       Common.Database,
                        Common.HTTPHelper,
                        Common.JSONHelper,
+                       Common.Onedrive,
                        Common.OnedriveInfo,
                        Common.ServerEnvironmentInfo
   -- other-extensions:    
@@ -80,6 +80,7 @@ executable BookIndexer
                                 Common.Database,
                                 Common.HTTPHelper,
                                 Common.JSONHelper,
+                                Common.Onedrive,
                                 Common.OnedriveInfo,
                                 Common.ServerEnvironmentInfo,
                                 Common.UserInfo

@@ -7,13 +7,14 @@ import BookIndexer.CouchDB.Changes.Watcher (watchChanges, WatchParams(..), Docum
 import qualified BookIndexer.CouchDB.Changes.Watcher as W (_id)
 import BookIndexer.Environment (Environment(Environment), manager, serverEnvironment)
 import BookIndexer.IndexerState (IndexerState(IndexerState), rev, lastSeq, indexerStateId)
-import BookIndexer.Onedrive.FolderChangesReader (FolderChangesReader, newFolderChangesReader, enumerateChanges)
+import BookIndexer.Onedrive.FolderChangesReader (FolderChangesReader, newFolderChangesReader, enumerateChanges, getCurrentEnumerationToken)
 import Common.BooksDirectoryInfo (getBooksDirectoryInfo, booksItemId)
 import Common.Database (usersDatabaseName, indexerDatabaseName, userDatabaseName, usersFilter)
 import Common.HTTPHelper (textUrlEncode)
 import Common.JSONHelper (jsonParser)
-import Common.OnedriveInfo (OnedriveInfo, onedriveInfoId, getOnedriveInfo, token)
-import Common.ServerEnvironmentInfo (getServerEnvironment, ServerEnvironmentInfo, couchdbServer)
+import qualified Common.Onedrive as OD (oauthRefreshTokenRequest, OauthTokenRequest(..), OauthTokenResponse(..), getOnedriveClientSecret)
+import Common.OnedriveInfo (OnedriveInfo, onedriveInfoId, getOnedriveInfo, token, refreshToken)
+import Common.ServerEnvironmentInfo (getServerEnvironment, ServerEnvironmentInfo, couchdbServer, onedriveClientId, appBaseUrl)
 import Common.UserInfo (UserInfo)
 import qualified Common.UserInfo as U (_id)
 import Control.Concurrent.Async (Async, async)
@@ -33,7 +34,7 @@ import Data.Conduit (($$), (=$=), Sink, passthroughSink)
 import Data.Conduit.Attoparsec (sinkParser)
 import qualified Data.Conduit.Combinators as DC (last, map, mapM, mapM_)
 import Data.Int (Int64)
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, fromJust)
 import Data.Monoid ((<>))
 import Data.Text (Text, unpack)
 import Data.Text.Encoding (encodeUtf8, decodeUtf8)
@@ -152,11 +153,39 @@ synchronizeUserLoop userInfo = do
   booksDirectoryInfo <- getBooksDirectoryInfo couchdbUrl userDatabaseId
   liftBase $ print booksDirectoryInfo
   onedriveReader <- newFolderChangesReader (onedriveInfo ^. token) (booksDirectoryInfo ^. booksItemId) Nothing
-  (enumerateChanges onedriveReader $$ DC.mapM_ (liftIO . print)) `catch` handleError
+  reauthorizeLoop readChanges doRefreshToken onedriveReader `catch` logError
   where
-    handleError :: (MonadThrow m, MonadIO m) => HttpException -> m ()
-    handleError e =
-      liftIO $ print e -- TODO proper handling, use reauthorizeLoop below
+    readChanges reader = do
+      tok <- getCurrentEnumerationToken reader
+      liftIO $ print tok
+      (enumerateChanges reader $$ DC.mapM_ (liftIO . print)) `catch` logError
+    doRefreshToken oldReader = do
+      secret <- liftIO OD.getOnedriveClientSecret
+      env <- view serverEnvironment
+      let
+        couchdbUrl =
+          env ^. couchdbServer
+        userDatabaseId =
+          userDatabaseName $ userInfo ^. U._id
+      onedriveInfo <- getOnedriveInfo couchdbUrl userDatabaseId
+      let
+        tok =
+          fromJust (onedriveInfo ^. refreshToken)
+        req =
+          OD.OauthTokenRequest
+          { OD.clientId = env ^. onedriveClientId
+          , OD.redirectUri = (env ^. appBaseUrl) <> "/onedrive-redirect"
+          , OD.clientSecret = secret
+          }
+      resp <- OD.oauthRefreshTokenRequest req tok
+      -- TODO update onedriveInfo in DB
+      currentEnumerationToken <- getCurrentEnumerationToken oldReader
+      booksDirectoryInfo <- getBooksDirectoryInfo couchdbUrl userDatabaseId
+      newFolderChangesReader (OD.accessToken resp) (booksDirectoryInfo ^. booksItemId) currentEnumerationToken
+    logError :: (MonadThrow m, MonadIO m) => HttpException -> m a
+    logError e = do
+      liftIO $ print e
+      throwM e
 
 
 reauthorizeLoop :: (MonadCatch m) => (a -> m ()) -> (a -> m a) -> a -> m ()
@@ -164,7 +193,7 @@ reauthorizeLoop worker reauthorizeHandler context = do
   needReauthorize <- iteration
   when needReauthorize $ do
     newContext <- reauthorizeHandler context
-    reauthorizeLoop worker reauthorizeHandler context
+    reauthorizeLoop worker reauthorizeHandler newContext
   where
     iteration =
       (worker context >> return False) `catch` handleError

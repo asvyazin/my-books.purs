@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
-module Web.Onedrive where
+module Common.Onedrive where
 
 
 import Common.JSONHelper (jsonParser)
@@ -17,7 +17,7 @@ import Data.Aeson.Types (FromJSON,
 import qualified Data.ByteString as B
 import Data.Conduit (($$))
 import Data.Conduit.Attoparsec (sinkParser)
-import qualified Data.Text as T (Text, append)
+import qualified Data.Text as T (Text, append, pack)
 import qualified Data.Text.Encoding as T (encodeUtf8)
 import Network.HTTP.Client.Conduit (HasHttpManager
                                    , parseUrl
@@ -28,7 +28,8 @@ import Network.HTTP.Client.Conduit (HasHttpManager
                                    , responseBody
                                    , withResponse)
 import Network.HTTP.Types.Header (hContentType, hAuthorization)
-import Network.HTTP.Types.URI (renderQuery)
+import Network.HTTP.Types.URI (renderSimpleQuery)
+import System.Environment (lookupEnv)
 
 
 data OauthTokenRequest =
@@ -36,7 +37,6 @@ data OauthTokenRequest =
   { clientId :: T.Text
   , redirectUri :: T.Text
   , clientSecret :: T.Text
-  , code :: T.Text
   } deriving (Eq, Show)
 
 
@@ -75,28 +75,60 @@ instance FromJSON OauthTokenResponse where
     typeMismatch "OauthTokenResponse" invalid
 
 
-serializeRequest :: OauthTokenRequest -> B.ByteString
-serializeRequest req =
-    let
-      qqsParams =
-        [ ("client_id", Just $ T.encodeUtf8 $ clientId req)
-        , ("redirect_uri", Just $ T.encodeUtf8 $ redirectUri req)
-        , ("client_secret", Just $ T.encodeUtf8 $ clientSecret req)
-        , ("code", Just $ T.encodeUtf8 $ code req)
-        , ("grant_type", Just "authorization_code")
-        ]
-    in
-      renderQuery False qqsParams
+authorizationTokenRequest :: OauthTokenRequest -> T.Text -> B.ByteString
+authorizationTokenRequest req code =
+  let
+    initParams =
+      serializeOauthTokenRequest req
+    params =
+      [ ("code", T.encodeUtf8 code)
+      , ("grant_type", "authorization_code")
+      ] ++ initParams
+  in
+    renderSimpleQuery False params
 
 
-oauthTokenRequest :: (MonadThrow m, MonadIO m, MonadReader env m, HasHttpManager env, MonadBaseControl IO m) => OauthTokenRequest -> m OauthTokenResponse
-oauthTokenRequest req = do
+refreshTokenRequest :: OauthTokenRequest -> T.Text -> B.ByteString
+refreshTokenRequest req tok =
+  let
+    params =
+      [ ("refresh_token", T.encodeUtf8 tok)
+      , ("grant_type", "refresh_token")
+      ] ++ serializeOauthTokenRequest req
+  in
+    renderSimpleQuery False params
+
+
+serializeOauthTokenRequest :: OauthTokenRequest -> [(B.ByteString, B.ByteString)]
+serializeOauthTokenRequest req =
+  [ ("client_id",  T.encodeUtf8 $ clientId req)
+  , ("redirect_uri",  T.encodeUtf8 $ redirectUri req)
+  , ("client_secret",  T.encodeUtf8 $ clientSecret req)
+  ]
+
+
+oauthTokenRequest :: (MonadThrow m, MonadIO m, MonadReader env m, HasHttpManager env, MonadBaseControl IO m) => OauthTokenRequest -> T.Text -> m OauthTokenResponse
+oauthTokenRequest req code = do
   initReq <- parseUrl "https://login.live.com/oauth20_token.srf"
   let
     httpReq =
       initReq
       { method = "POST"
-      , requestBody = RequestBodyBS (serializeRequest req)
+      , requestBody = RequestBodyBS (authorizationTokenRequest req code)
+      , requestHeaders = [(hContentType, "application/x-www-form-urlencoded")]
+      }
+  withResponse httpReq $ \resp ->
+    responseBody resp $$ sinkParser jsonParser
+
+
+oauthRefreshTokenRequest :: (MonadThrow m, MonadIO m, MonadReader env m, HasHttpManager env, MonadBaseControl IO m) => OauthTokenRequest -> T.Text -> m OauthTokenResponse
+oauthRefreshTokenRequest req tok = do
+  initReq <- parseUrl "https://login.live.com/oauth20_token.srf"
+  let
+    httpReq =
+      initReq
+      { method = "POST"
+      , requestBody = RequestBodyBS (refreshTokenRequest req tok)
       , requestHeaders = [(hContentType, "application/x-www-form-urlencoded")]
       }
   withResponse httpReq $ \resp ->
@@ -128,3 +160,8 @@ instance FromJSON UserInfo where
 
   parseJSON invalid =
     typeMismatch "UserInfo" invalid
+
+
+getOnedriveClientSecret :: IO T.Text
+getOnedriveClientSecret =
+  maybe "-4tKnVPaAyIEAgYrBp8R6jTYY0zClN6c" T.pack <$> lookupEnv "ONEDRIVE_CLIENT_SECRET"
