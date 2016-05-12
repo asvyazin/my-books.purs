@@ -52,7 +52,7 @@ data OnedriveItem =
   , onedriveItemSize :: Int64
   , onedriveItemSpecialFolder :: Maybe SpecialFolderFacet
   , onedriveItemVideo :: Maybe VideoFacet
-  , onedriveItemWebDavUrl :: Text
+  , onedriveItemWebDavUrl :: Maybe Text
   , onedriveItemWebUrl :: Text
   } deriving (Show)
 
@@ -61,7 +61,7 @@ instance FromJSON OnedriveItem where
   parseJSON (Object o) =
     OnedriveItem <$>
     o .: "id" <*>
-    o .: "audio" <*>
+    o .:? "audio" <*>
     o .: "createdBy" <*>
     o .: "createdDateTime" <*>
     o .: "cTag" <*>
@@ -86,7 +86,7 @@ instance FromJSON OnedriveItem where
     o .: "size" <*>
     o .:? "specialFolder" <*>
     o .:? "video" <*>
-    o .: "webDavUrl" <*>
+    o .:? "webDavUrl" <*>
     o .: "webUrl"
   parseJSON _ =
     error "Invalid OnedriveItem JSON"

@@ -22,7 +22,7 @@ data IndexerState =
   IndexerState
   { indexerStateRev :: Maybe String
   , indexerStateLastSeq :: Int64
-  }
+  } deriving (Show)
 
 
 makeLensesWith camelCaseFields ''IndexerState

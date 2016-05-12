@@ -67,8 +67,8 @@ getChangesBatch accessToken itemId enumerationToken = do
   let
     tokenParam tok =
       ("token", Just (encodeUtf8 tok))
-    qsParams =
-      maybeToList $ tokenParam <$> enumerationToken
+    qsParams = ("top", Just "100") :
+      maybeToList (tokenParam <$> enumerationToken)
     path =
       toByteString $ encodePath ["drive", "items", itemId, "view.delta"] qsParams
   initReq <- parseRequest $ unpack $ "https://api.onedrive.com/v1.0" <> path
@@ -84,11 +84,11 @@ data FolderChangesBatch =
   , folderChangesBatchNextLink :: Maybe Text
   , folderChangesBatchDeltaLink :: Maybe Text
   , folderChangesBatchToken :: Text
-  }
+  } deriving (Show)
 
 
 instance FromJSON FolderChangesBatch where
   parseJSON (Object o) =
-    FolderChangesBatch <$> o .: "value" <*> o .: "@odata.nextLink" <*> o .: "@odata.deltaLink" <*> o .: "@delta.token"
+    FolderChangesBatch <$> o .: "value" <*> o .:? "@odata.nextLink" <*> o .:? "@odata.deltaLink" <*> o .: "@delta.token"
   parseJSON _ =
     error "Invalid FolderChangesBatch JSON"

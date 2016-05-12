@@ -5,23 +5,22 @@ module Main (main) where
 
 import BookIndexer.CouchDB.Changes.Watcher (watchChanges, WatchParams(..), DocumentChange, _seq)
 import qualified BookIndexer.CouchDB.Changes.Watcher as W (_id)
-import BookIndexer.Environment (Environment(Environment), manager, serverEnvironment)
-import BookIndexer.IndexerState (IndexerState(IndexerState), rev, lastSeq, indexerStateId)
-import BookIndexer.Onedrive.FolderChangesReader (FolderChangesReader, newFolderChangesReader, enumerateChanges, getCurrentEnumerationToken)
+import BookIndexer.Environment (Environment(Environment), serverEnvironment)
+import BookIndexer.IndexerState (IndexerState(IndexerState), lastSeq, indexerStateId)
+import BookIndexer.Onedrive.FolderChangesReader (newFolderChangesReader, enumerateChanges, getCurrentEnumerationToken)
 import Common.BooksDirectoryInfo (getBooksDirectoryInfo, booksItemId)
 import Common.Database (usersDatabaseName, indexerDatabaseName, userDatabaseName, usersFilter)
-import Common.HTTPHelper (textUrlEncode)
 import Common.JSONHelper (jsonParser)
 import qualified Common.Onedrive as OD (oauthRefreshTokenRequest, OauthTokenRequest(..), OauthTokenResponse(..), getOnedriveClientSecret)
-import Common.OnedriveInfo (OnedriveInfo, onedriveInfoId, getOnedriveInfo, token, refreshToken)
-import Common.ServerEnvironmentInfo (getServerEnvironment, ServerEnvironmentInfo, couchdbServer, onedriveClientId, appBaseUrl)
+import Common.OnedriveInfo (getOnedriveInfo, token, refreshToken)
+import Common.ServerEnvironmentInfo (getServerEnvironment, couchdbServer, onedriveClientId, appBaseUrl)
 import Common.UserInfo (UserInfo)
 import qualified Common.UserInfo as U (_id)
 import Control.Concurrent.Async (Async, async)
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TVar (newTVar, modifyTVar, TVar)
 import Control.Lens ((^.), view, set)
-import Control.Monad (void, (=<<), when)
+import Control.Monad (void, when)
 import Control.Monad.Base (MonadBase(liftBase))
 import Control.Monad.Catch (MonadThrow(throwM), MonadCatch(catch))
 import Control.Monad.IO.Class (MonadIO(liftIO))
@@ -29,19 +28,16 @@ import Control.Monad.Reader (runReaderT, withReaderT)
 import Control.Monad.Reader.Class (MonadReader(ask))
 import Control.Monad.Trans.Control (MonadBaseControl)
 import Control.Monad.Trans.Resource (runResourceT)
-import Data.Aeson (FromJSON(parseJSON), Value(Object), (.:), ToJSON(toJSON), (.=), object)
 import Data.Conduit (($$), (=$=), Sink, passthroughSink)
 import Data.Conduit.Attoparsec (sinkParser)
 import qualified Data.Conduit.Combinators as DC (last, map, mapM, mapM_)
 import Data.Int (Int64)
-import Data.Maybe (catMaybes, fromJust)
+import Data.Maybe (fromJust)
 import Data.Monoid ((<>))
 import Data.Text (Text, unpack)
-import Data.Text.Encoding (encodeUtf8, decodeUtf8)
-import Network.HTTP.Client.Conduit (withResponse, responseBody, HasHttpManager(getHttpManager), withManager, httpNoBody, HttpException(StatusCodeException), Manager)
+import Network.HTTP.Client.Conduit (withResponse, responseBody, withManager, httpNoBody, HttpException(StatusCodeException))
 import Network.HTTP.Simple (setRequestMethod, setRequestBodyJSON, parseRequest)
 import Network.HTTP.Types.Status (notFound404, unauthorized401)
-import Network.HTTP.Types.URI (urlEncode)
 
 
 type UserSynchronizers =
@@ -98,14 +94,14 @@ newIndexerState current ls =
 
   
 watchNewUsersLoop :: (MonadReader Environment m, MonadThrow m, MonadIO m, MonadBase IO m, MonadBaseControl IO m) => UserSynchronizers -> Maybe Int64 -> m (Maybe Int64)
-watchNewUsersLoop userSynchronizers lastSeq = do
+watchNewUsersLoop userSynchronizers ls = do
   couchdbUrl <- view (serverEnvironment . couchdbServer)
   let
     watchParams =
       WatchParams
       { _baseUrl = couchdbUrl
       , _database = usersDatabaseName
-      , _since = lastSeq
+      , _since = ls
       , _filter = Just usersFilter
       }
     watchNewUsersLoop' =
