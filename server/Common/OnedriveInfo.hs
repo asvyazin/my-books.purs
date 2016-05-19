@@ -4,21 +4,15 @@
 module Common.OnedriveInfo where
 
 
-import Common.JSONHelper (jsonParser)
 import Control.Lens (makeLenses, (^.))
 import Control.Monad (void)
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class (MonadIO)
-import Control.Monad.Reader.Class (MonadReader)
-import Control.Monad.Trans.Control (MonadBaseControl)
 import Data.Aeson (FromJSON(parseJSON), Value(Object), (.:), (.:?), ToJSON(toJSON), object, (.=))
-import Data.Conduit (($$))
-import Data.Conduit.Attoparsec (sinkParser)
 import Data.Maybe (catMaybes)
 import Data.Monoid ((<>))
 import Data.Text (Text, unpack)
-import Network.HTTP.Client.Conduit (HasHttpManager, withResponse, responseBody, httpNoBody)
-import Network.HTTP.Simple (parseRequest, setRequestMethod, setRequestBodyJSON)
+import Network.HTTP.Simple (parseRequest, setRequestMethod, setRequestBodyJSON, httpJSON, getResponseBody, httpLBS)
 
 
 data OnedriveInfo =
@@ -65,17 +59,16 @@ onedriveInfoUrl couchdbUrl databaseId =
   unpack $ couchdbUrl <> "/" <> databaseId <> "/" <> onedriveInfoId
 
 
-getOnedriveInfo :: (MonadReader env m, HasHttpManager env, MonadThrow m, MonadBaseControl IO m, MonadIO m) => Text -> Text -> m OnedriveInfo
+getOnedriveInfo :: (MonadThrow m, MonadIO m) => Text -> Text -> m OnedriveInfo
 getOnedriveInfo couchdbUrl databaseId = do
   req <- parseRequest $ onedriveInfoUrl couchdbUrl databaseId
-  withResponse req $ \resp ->
-    responseBody resp $$ sinkParser jsonParser
+  getResponseBody <$> httpJSON req
 
 
-setOnedriveInfo :: (MonadReader env m, HasHttpManager env, MonadThrow m, MonadBaseControl IO m, MonadIO m) => Text -> Text -> OnedriveInfo -> m ()
+setOnedriveInfo :: (MonadThrow m, MonadIO m) => Text -> Text -> OnedriveInfo -> m ()
 setOnedriveInfo couchdbUrl databaseId onedriveInfo = do
   initReq <- parseRequest $ onedriveInfoUrl couchdbUrl databaseId
   let
     req =
       setRequestMethod "PUT" $ setRequestBodyJSON onedriveInfo initReq
-  void $ httpNoBody req
+  void $ httpLBS req

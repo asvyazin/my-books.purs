@@ -3,11 +3,8 @@
 module Common.Onedrive where
 
 
-import Common.JSONHelper (jsonParser)
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class (MonadIO)
-import Control.Monad.Reader.Class (MonadReader)
-import Control.Monad.Trans.Control (MonadBaseControl)
 import Data.Aeson.Types (FromJSON,
                          parseJSON,
                          Value(String, Object),
@@ -15,20 +12,10 @@ import Data.Aeson.Types (FromJSON,
                          (.:),
                          (.:?))
 import qualified Data.ByteString as B
-import Data.Conduit (($$))
-import Data.Conduit.Attoparsec (sinkParser)
 import qualified Data.Text as T (Text, append, pack)
 import qualified Data.Text.Encoding as T (encodeUtf8)
-import Network.HTTP.Client.Conduit (HasHttpManager
-                                   , parseUrl
-                                   , method
-                                   , requestBody
-                                   , RequestBody (RequestBodyBS)
-                                   , requestHeaders
-                                   , responseBody
-                                   , withResponse)
-import Network.HTTP.Types.Header (hContentType, hAuthorization)
-import Network.HTTP.Types.URI (renderSimpleQuery)
+import Network.HTTP.Simple (parseRequest, httpJSON, getResponseBody, setRequestHeaders, setRequestMethod, setRequestBodyURLEncoded)
+import Network.HTTP.Types.Header (hAuthorization)
 import System.Environment (lookupEnv)
 
 
@@ -75,30 +62,6 @@ instance FromJSON OauthTokenResponse where
     typeMismatch "OauthTokenResponse" invalid
 
 
-authorizationTokenRequest :: OauthTokenRequest -> T.Text -> B.ByteString
-authorizationTokenRequest req code =
-  let
-    initParams =
-      serializeOauthTokenRequest req
-    params =
-      [ ("code", T.encodeUtf8 code)
-      , ("grant_type", "authorization_code")
-      ] ++ initParams
-  in
-    renderSimpleQuery False params
-
-
-refreshTokenRequest :: OauthTokenRequest -> T.Text -> B.ByteString
-refreshTokenRequest req tok =
-  let
-    params =
-      [ ("refresh_token", T.encodeUtf8 tok)
-      , ("grant_type", "refresh_token")
-      ] ++ serializeOauthTokenRequest req
-  in
-    renderSimpleQuery False params
-
-
 serializeOauthTokenRequest :: OauthTokenRequest -> [(B.ByteString, B.ByteString)]
 serializeOauthTokenRequest req =
   [ ("client_id",  T.encodeUtf8 $ clientId req)
@@ -107,42 +70,43 @@ serializeOauthTokenRequest req =
   ]
 
 
-oauthTokenRequest :: (MonadThrow m, MonadIO m, MonadReader env m, HasHttpManager env, MonadBaseControl IO m) => OauthTokenRequest -> T.Text -> m OauthTokenResponse
+oauthTokenRequest :: (MonadThrow m, MonadIO m) => OauthTokenRequest -> T.Text -> m OauthTokenResponse
 oauthTokenRequest req code = do
-  initReq <- parseUrl "https://login.live.com/oauth20_token.srf"
+  initReq <- parseRequest "https://login.live.com/oauth20_token.srf"
   let
+    initParams =
+      serializeOauthTokenRequest req
+    params =
+      [ ("code", T.encodeUtf8 code)
+      , ("grant_type", "authorization_code")
+      ] ++ initParams
     httpReq =
-      initReq
-      { method = "POST"
-      , requestBody = RequestBodyBS (authorizationTokenRequest req code)
-      , requestHeaders = [(hContentType, "application/x-www-form-urlencoded")]
-      }
-  withResponse httpReq $ \resp ->
-    responseBody resp $$ sinkParser jsonParser
+      setRequestMethod "POST" $ setRequestBodyURLEncoded params initReq
+  getResponseBody <$> httpJSON httpReq
 
 
-oauthRefreshTokenRequest :: (MonadThrow m, MonadIO m, MonadReader env m, HasHttpManager env, MonadBaseControl IO m) => OauthTokenRequest -> T.Text -> m OauthTokenResponse
+oauthRefreshTokenRequest :: (MonadThrow m, MonadIO m) => OauthTokenRequest -> T.Text -> m OauthTokenResponse
 oauthRefreshTokenRequest req tok = do
-  initReq <- parseUrl "https://login.live.com/oauth20_token.srf"
+  initReq <- parseRequest "https://login.live.com/oauth20_token.srf"
   let
+    initParams =
+      serializeOauthTokenRequest req
+    params =
+      [ ("refresh_token", T.encodeUtf8 tok)
+      , ("grant_type", "refresh_token")
+      ] ++ initParams
     httpReq =
-      initReq
-      { method = "POST"
-      , requestBody = RequestBodyBS (refreshTokenRequest req tok)
-      , requestHeaders = [(hContentType, "application/x-www-form-urlencoded")]
-      }
-  withResponse httpReq $ \resp ->
-    responseBody resp $$ sinkParser jsonParser
+      setRequestMethod "POST" $ setRequestBodyURLEncoded params initReq
+  getResponseBody <$> httpJSON httpReq
 
 
-me :: (MonadThrow m, MonadIO m, MonadReader env m, HasHttpManager env, MonadBaseControl IO m) => T.Text -> m UserInfo
+me :: (MonadThrow m, MonadIO m) => T.Text -> m UserInfo
 me token = do
-  initReq <- parseUrl "https://apis.live.net/v5.0/me"
+  initReq <- parseRequest "https://apis.live.net/v5.0/me"
   let
     httpReq =
-      initReq { requestHeaders = [(hAuthorization, T.encodeUtf8 ("Bearer " `T.append` token))] }
-  withResponse httpReq $ \resp ->
-    responseBody resp $$ sinkParser jsonParser
+      setRequestHeaders [(hAuthorization, T.encodeUtf8 ("Bearer " `T.append` token))] initReq
+  getResponseBody <$> httpJSON httpReq
 
 
 data UserInfo =

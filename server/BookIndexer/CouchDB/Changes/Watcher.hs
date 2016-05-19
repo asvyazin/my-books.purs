@@ -4,30 +4,29 @@
 module BookIndexer.CouchDB.Changes.Watcher where
 
 
+import Common.JSONHelper (jsonParser)
+import Control.Applicative ((<|>))
 import Control.Lens (makeLenses)
-import Control.Monad.Catch (MonadThrow)
+import Control.Monad.Catch (MonadMask)
 import Control.Monad.IO.Class (MonadIO)
-import Control.Monad.Reader (runReaderT)
-import Control.Monad.Reader.Class (MonadReader(ask))
-import Control.Monad.Trans.Resource (MonadResource)
 import Blaze.ByteString.Builder (toByteString)
-import Data.Aeson (FromJSON(parseJSON), Value(Object), (.:), (.:?), json', fromJSON, Result(Success, Error))
-import Data.Attoparsec.ByteString.Char8 (Parser, endOfLine)
+import Data.Aeson (FromJSON(parseJSON), Value(Object), (.:), (.:?))
+import Data.Attoparsec.ByteString.Char8 (Parser)
 import Data.ByteString.Char8 (pack, unpack)
-import Data.Conduit (Source, (=$=), bracketP)
+import Data.Conduit ((=$=), Sink)
 import Data.Conduit.Attoparsec (conduitParser)
-import qualified Data.Conduit.List as CL (map)
+import qualified Data.Conduit.Combinators as DC (map)
 import Data.Int (Int64)
 import Data.Maybe (catMaybes, fromMaybe)
 import Data.Monoid ((<>))
 import Data.Text (Text)
 import Data.Text.Encoding (encodeUtf8)
 import Network.HTTP.Types.URI (renderQuery, encodePathSegments)
-import Network.HTTP.Client.Conduit (parseUrl, responseBody, HasHttpManager, responseOpen, responseClose)
+import Network.HTTP.Simple (parseRequest, httpSink)
 
 
-watchChanges :: (MonadThrow m, MonadReader env m, HasHttpManager env, MonadIO m, MonadResource m) => WatchParams -> Source m DocumentChange
-watchChanges params = do
+watchChanges :: (MonadIO m, MonadMask m) => WatchParams -> Sink WatchItem m a -> m a
+watchChanges params consumer = do
   let
     sinceParam i64 =
       ("since", Just $ pack $ show i64)
@@ -47,18 +46,8 @@ watchChanges params = do
     url =
       encodeUtf8 (_baseUrl params) <> toByteString (encodePathSegments [_database params, "_changes"]) <> qs
 
-  req <- parseUrl $ unpack url
-  withResponse' req $ \resp ->
-    responseBody resp =$= conduitParser changesParser =$= CL.map snd
-  where
-    withResponse' req func = do
-      httpEnv <- ask
-      let
-        responseOpen' =
-          runReaderT (responseOpen req) httpEnv
-        responseClose' resp =
-          runReaderT (responseClose resp) httpEnv
-      bracketP responseOpen' responseClose' func
+  req <- parseRequest $ unpack url
+  httpSink req $ const $ conduitParser watchItemParser =$= DC.map snd =$= consumer
 
 
 data WatchParams =
@@ -68,6 +57,12 @@ data WatchParams =
   , _since :: Maybe Int64
   , _filter :: Maybe Text
   }
+
+
+data WatchItem
+  = DocumentChangeItem DocumentChange
+  | LastSeqItem LastSeq
+  deriving (Show)
 
 
 data DocumentChange =
@@ -101,15 +96,24 @@ instance FromJSON Change where
     error "Invalid Change JSON"
 
 
-changesParser :: Parser DocumentChange
-changesParser = do
-  v <- json' <* endOfLine
-  case fromJSON v of
-    Success r ->
-      return r
-    Error e ->
-      fail e
+data LastSeq =
+  LastSeq
+  { _lastSeq :: Int64
+  } deriving (Show)
+
+
+instance FromJSON LastSeq where
+  parseJSON (Object o) =
+    LastSeq <$> o .: "last_seq"
+  parseJSON _ =
+    error "Invalid LastSeq JSON"
+
+
+watchItemParser :: Parser WatchItem
+watchItemParser =
+  (DocumentChangeItem <$> jsonParser) <|> (LastSeqItem <$> jsonParser)
 
 
 makeLenses ''DocumentChange
 makeLenses ''Change
+makeLenses ''LastSeq

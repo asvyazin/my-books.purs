@@ -13,15 +13,12 @@ import Control.Lens ((^.), set)
 import Control.Monad (when, void)
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class (MonadIO(liftIO))
-import Control.Monad.Reader.Class (MonadReader)
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.Control (MonadBaseControl)
 import Data.Maybe (fromJust)
 import Data.Monoid ((<>))
 import qualified Data.Text as T (Text, concat)
 import qualified Data.Text.Encoding as T (decodeUtf8)
 import qualified Data.Text.Lazy as TL
-import Network.HTTP.Client.Conduit (withManager, HasHttpManager)
 import Network.Wai (queryString)
 import qualified Network.Wai.Middleware.Static as Wai
 import System.Directory (getCurrentDirectory)
@@ -88,7 +85,7 @@ main = do
             , redirectUri = _appBaseUrl serverEnvironment <> "/onedrive-redirect"
             , clientSecret = onedriveClientSecret
             }
-      resp <- lift $ withManager $ oauthTokenRequest req $ T.decodeUtf8 $ fromJust c
+      resp <- lift $ oauthTokenRequest req $ T.decodeUtf8 $ fromJust c
       void $ liftIO $ forkIO $ updateOnedriveInfoSync (_couchdbServer serverEnvironment) resp
       setCookie "onedriveToken" (accessToken resp) defaultCookieSettings
       redirect "/"
@@ -148,12 +145,11 @@ updateOnedriveInfoSync :: T.Text -> OauthTokenResponse -> IO ()
 updateOnedriveInfoSync couchdbUrl resp = do
   let
     tok = accessToken resp
-  withManager $ do
-    user <- me tok
-    updateOnedriveInfoIfNeeded couchdbUrl (OD.__id user) resp
+  user <- me tok
+  updateOnedriveInfoIfNeeded couchdbUrl (OD.__id user) resp
 
 
-updateOnedriveInfoIfNeeded :: (MonadReader env m, HasHttpManager env, MonadThrow m, MonadBaseControl IO m, MonadIO m) => T.Text -> T.Text -> OauthTokenResponse -> m ()
+updateOnedriveInfoIfNeeded :: (MonadThrow m, MonadIO m) => T.Text -> T.Text -> OauthTokenResponse -> m ()
 updateOnedriveInfoIfNeeded couchdbUrl userId tokenResp = do
   let
     databaseId = userDatabaseName userId
