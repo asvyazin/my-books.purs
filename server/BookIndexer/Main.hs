@@ -169,7 +169,8 @@ synchronizeUserLoop userInfo = do
     logError e = do
       liftIO $ print e
       throwM e
-    processItem _ =
+    processItem i = do
+      liftIO $ print i
       return ()
 
 
