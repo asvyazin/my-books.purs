@@ -3,7 +3,7 @@
 module Main (main) where
 
 
-import BookIndexer.CouchDB.Changes.Watcher (watchChanges, WatchParams(..), DocumentChange, WatchItem(..), LastSeq(..))
+import BookIndexer.CouchDB.Changes.Watcher (watchChanges, WatchParams(..), DocumentChange)
 import qualified BookIndexer.CouchDB.Changes.Watcher as W (_id)
 import BookIndexer.IndexerState (IndexerState(IndexerState), lastSeq, indexerStateId)
 import BookIndexer.Onedrive.FolderChangesReader (newFolderChangesReader, enumerateChanges, getCurrentEnumerationToken)
@@ -99,10 +99,8 @@ watchNewUsersLoop userSynchronizers ls = do
   watchChanges watchParams (DC.concatMapM (processWatchItem userSynchronizers) =$= DC.last) -- TODO: catch exceptions
 
 
-processWatchItem :: (MonadIO m, MonadReader ServerEnvironmentInfo m, MonadThrow m) => UserSynchronizers -> WatchItem -> m (Maybe Int64)
-processWatchItem _ (LastSeqItem (LastSeq ls)) =
-  return $ Just ls
-processWatchItem userSynchronizers (DocumentChangeItem documentChange) =
+processWatchItem :: (MonadIO m, MonadReader ServerEnvironmentInfo m, MonadThrow m) => UserSynchronizers -> DocumentChange -> m (Maybe Int64)
+processWatchItem userSynchronizers documentChange =
   getUserInfo documentChange >>= processUser userSynchronizers >> return Nothing
 
 

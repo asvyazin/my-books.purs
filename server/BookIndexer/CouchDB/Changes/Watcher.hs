@@ -6,37 +6,36 @@ module BookIndexer.CouchDB.Changes.Watcher where
 
 import Common.JSONHelper (jsonParser)
 import Control.Applicative ((<|>))
-import Control.Exception (Exception)
 import Control.Lens (makeLenses)
-import Control.Monad.Catch (MonadMask, catch, throwM)
+import Control.Monad.Catch (MonadMask)
 import Control.Monad.IO.Class (MonadIO)
 import Blaze.ByteString.Builder (toByteString)
 import Data.Aeson (FromJSON(parseJSON), Value(Object), (.:), (.:?))
 import Data.Attoparsec.ByteString.Char8 (Parser)
 import Data.ByteString.Char8 (pack, unpack)
-import Data.Conduit ((=$=), Sink)
+import Data.Conduit ((=$=), Sink, fuseBoth, await, yield)
 import Data.Conduit.Attoparsec (conduitParser)
-import qualified Data.Conduit.Combinators as DC (map, iterM)
+import qualified Data.Conduit.Combinators as DC (map)
 import Data.Int (Int64)
 import Data.Maybe (catMaybes, fromMaybe)
 import Data.Monoid ((<>))
 import Data.Text (Text)
 import Data.Text.Encoding (encodeUtf8)
-import Data.Typeable (Typeable)
 import Network.HTTP.Types.URI (renderQuery, encodePathSegments)
 import Network.HTTP.Simple (parseRequest, httpSink)
 
 
-watchChanges :: (MonadIO m, MonadMask m) => WatchParams -> Sink WatchItem m a -> m a
-watchChanges params consumer =
-  watchChanges' params consumer `catch` handleError params consumer
-  where
-    handleError :: (MonadIO m, MonadMask m) => WatchParams -> Sink WatchItem m a -> BatchFinishedException -> m a
-    handleError p c (BatchFinishedException ls) =
-      watchChanges p { _since = Just ls } c
+watchChanges :: (MonadIO m, MonadMask m) => WatchParams -> Sink DocumentChange m a -> m a
+watchChanges params consumer = do
+  (maybeLs, result) <- watchChanges' params consumer
+  case maybeLs of
+    Nothing ->
+      return result
+    Just ls ->
+      watchChanges params { _since = Just ls } consumer
 
 
-watchChanges' :: (MonadIO m, MonadMask m) => WatchParams -> Sink WatchItem m a -> m a
+watchChanges' :: (MonadIO m, MonadMask m) => WatchParams -> Sink DocumentChange m a -> m (Maybe Int64, a)
 watchChanges' params consumer = do
   let
     sinceParam i64 =
@@ -57,13 +56,17 @@ watchChanges' params consumer = do
     url =
       encodeUtf8 (_baseUrl params) <> toByteString (encodePathSegments [_database params, "_changes"]) <> qs
 
-    checkItem (LastSeqItem (LastSeq ls)) =
-      throwM $ BatchFinishedException ls
-    checkItem _ =
-      return ()
+    findLastSeq =
+      await >>= maybe (return Nothing) go
+      where
+        go (LastSeqItem (LastSeq ls)) =
+          return $ Just ls
+        go (DocumentChangeItem i) = do
+          yield i
+          findLastSeq
 
   req <- parseRequest $ unpack url
-  httpSink req $ const $ conduitParser watchItemParser =$= DC.map snd =$= DC.iterM checkItem =$= consumer
+  httpSink req $ const $ conduitParser watchItemParser =$= DC.map snd =$= findLastSeq `fuseBoth` consumer
 
 
 data WatchParams =
@@ -128,14 +131,6 @@ instance FromJSON LastSeq where
 watchItemParser :: Parser WatchItem
 watchItemParser =
   (DocumentChangeItem <$> jsonParser) <|> (LastSeqItem <$> jsonParser)
-
-
-data BatchFinishedException =
-  BatchFinishedException Int64
-  deriving (Show, Typeable)
-
-
-instance Exception BatchFinishedException
 
 
 makeLenses ''DocumentChange
