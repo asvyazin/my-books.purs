@@ -24,7 +24,6 @@ import Control.Monad.Catch (MonadThrow(throwM), MonadCatch(catch), MonadMask)
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Reader (runReaderT)
 import Control.Monad.Reader.Class (MonadReader(ask))
-import Control.Monad.Trans.Control (MonadBaseControl)
 import Data.Conduit (($$), (=$=))
 import qualified Data.Conduit.Combinators as DC (last, mapM_, concatMapM)
 import Data.Int (Int64)
@@ -127,7 +126,7 @@ processUser userSynchronizers userInfo = do
   return ()
 
 
-synchronizeUserLoop :: (MonadCatch m, MonadIO m, MonadReader ServerEnvironmentInfo m, MonadBaseControl IO m) => UserInfo -> m ()
+synchronizeUserLoop :: (MonadCatch m, MonadIO m, MonadReader ServerEnvironmentInfo m) => UserInfo -> m ()
 synchronizeUserLoop userInfo = do
   couchdbUrl <- view couchdbServer
   let
