@@ -4,3 +4,6 @@
 [submodule "epub-metadata"]
 	path = epub-metadata
 	url = https://github.com/asvyazin/epub-metadata.git
+[submodule "hs-onedrive"]
+	path = server/hs-onedrive
+	url = https://github.com/asvyazin/hs-onedrive.git
