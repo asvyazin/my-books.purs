@@ -21,10 +21,10 @@ makeLenses ''ServerEnvironmentInfo
 
 
 instance ToJSON ServerEnvironmentInfo where
-  toJSON (ServerEnvironmentInfo appBaseUrl onedriveClientId couchdbServer) =
-    object [ "appBaseUrl" .= appBaseUrl
-           , "onedriveClientId" .= onedriveClientId
-           , "couchdbServer" .= couchdbServer
+  toJSON (ServerEnvironmentInfo baseUrl clientId couchdb) =
+    object [ "baseUrl" .= baseUrl
+           , "onedriveClientId" .= clientId
+           , "couchdbServer" .= couchdb
            ]
 
 

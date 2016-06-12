@@ -1,4 +1,8 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 module BookIndexer.Onedrive.OnedriveItem where
 
 
@@ -19,6 +23,7 @@ import BookIndexer.Onedrive.SharedFacet (SharedFacet)
 import BookIndexer.Onedrive.SharepointIdsFacet (SharepointIdsFacet)
 import BookIndexer.Onedrive.SpecialFolderFacet (SpecialFolderFacet)
 import BookIndexer.Onedrive.VideoFacet (VideoFacet)
+import Control.Lens (makeLensesWith, camelCaseFields)
 import Data.Aeson (FromJSON(parseJSON), Value(Object), (.:), (.:?))
 import Data.Int (Int64)
 import Data.Text (Text)
@@ -90,3 +95,6 @@ instance FromJSON OnedriveItem where
     o .: "webUrl"
   parseJSON _ =
     error "Invalid OnedriveItem JSON"
+
+
+makeLensesWith camelCaseFields ''OnedriveItem

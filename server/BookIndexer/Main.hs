@@ -7,6 +7,7 @@ import BookIndexer.CouchDB.Changes.Watcher (watchChanges, WatchParams(..), Docum
 import qualified BookIndexer.CouchDB.Changes.Watcher as W (_id)
 import BookIndexer.IndexerState (IndexerState(IndexerState), lastSeq, indexerStateId)
 import BookIndexer.Onedrive.FolderChangesReader (newFolderChangesReader, enumerateChanges, getCurrentEnumerationToken)
+import BookIndexer.Onedrive.OnedriveItem (name)
 import Common.BooksDirectoryInfo (getBooksDirectoryInfo, booksItemId)
 import Common.Database (usersDatabaseName, indexerDatabaseName, userDatabaseName, usersFilter)
 import qualified Common.Onedrive as OD (oauthRefreshTokenRequest, OauthTokenRequest(..), OauthTokenResponse(..), getOnedriveClientSecret)
@@ -29,7 +30,7 @@ import qualified Data.Conduit.Combinators as DC (last, mapM_, concatMapM)
 import Data.Int (Int64)
 import Data.Maybe (fromJust)
 import Data.Monoid ((<>))
-import Data.Text (Text, unpack)
+import Data.Text (Text, unpack, takeEnd)
 import Network.HTTP.Client.Conduit (HttpException(StatusCodeException))
 import Network.HTTP.Simple (setRequestMethod, setRequestBodyJSON, parseRequest, httpJSON, getResponseBody, httpLBS)
 import Network.HTTP.Types.Status (notFound404, unauthorized401)
@@ -83,7 +84,7 @@ newIndexerState :: Maybe IndexerState -> Int64 -> IndexerState
 newIndexerState current ls =
   maybe (IndexerState Nothing ls) (set lastSeq ls) current
 
-  
+
 watchNewUsersLoop :: (MonadReader ServerEnvironmentInfo m, MonadMask  m, MonadIO m) => UserSynchronizers -> Maybe Int64 -> m (Maybe Int64)
 watchNewUsersLoop userSynchronizers ls = do
   couchdbUrl <- view couchdbServer
@@ -116,7 +117,7 @@ getObjectUrl :: MonadReader ServerEnvironmentInfo m => Text -> Text -> m String
 getObjectUrl databaseId objectId = do
   couchdbUrl <- view couchdbServer
   return $ unpack $ couchdbUrl <> "/" <> databaseId <> "/" <> objectId
-  
+
 
 processUser :: (MonadIO m, MonadReader ServerEnvironmentInfo m) => UserSynchronizers -> UserInfo -> m ()
 processUser userSynchronizers userInfo = do
@@ -166,9 +167,16 @@ synchronizeUserLoop userInfo = do
     logError e = do
       liftIO $ print e
       throwM e
-    processItem i = do
-      liftIO $ print i
-      return ()
+    processItem i =
+      when (isInterestingItem i) $ do
+        let filename = i ^. name
+        liftIO $ print filename
+    isInterestingItem i =
+      let
+        filename = i ^. name
+        ext = takeEnd 5 filename
+      in
+        ext == ".epub"
 
 
 reauthorizeLoop :: (MonadCatch m) => (a -> m ()) -> (a -> m a) -> a -> m ()
