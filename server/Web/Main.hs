@@ -4,8 +4,7 @@ module Main (main) where
 
 
 import Common.Database (userDatabaseName)
-import Common.Onedrive (OauthTokenRequest(..), oauthTokenRequest, OauthTokenResponse(..), me, getOnedriveClientSecret)
-import qualified Common.Onedrive as OD (UserInfo(..))
+import Common.Onedrive (getOnedriveClientSecret)
 import Common.OnedriveInfo (getOnedriveInfo, setOnedriveInfo, token, refreshToken)
 import Common.ServerEnvironmentInfo (ServerEnvironmentInfo(..), getServerEnvironment)
 import Control.Concurrent (forkIO)
@@ -21,6 +20,10 @@ import qualified Data.Text.Encoding as T (decodeUtf8)
 import qualified Data.Text.Lazy as TL
 import Network.Wai (queryString)
 import qualified Network.Wai.Middleware.Static as Wai
+import Onedrive.Auth (requestToken, me)
+import Onedrive.Types.OauthTokenRequest (OauthTokenRequest(OauthTokenRequest))
+import qualified Onedrive.Types.OauthTokenResponse as Resp (OauthTokenResponse, refreshToken, accessToken)
+import Onedrive.Types.UserInfo (UserInfo, id_)
 import System.Directory (getCurrentDirectory)
 import System.Environment (lookupEnv)
 import System.FilePath ((</>))
@@ -80,14 +83,10 @@ main = do
       qs <- queryString <$> request
       let c = pa "code" qs
       let req =
-            OauthTokenRequest
-            { clientId = _onedriveClientId serverEnvironment
-            , redirectUri = _appBaseUrl serverEnvironment <> "/onedrive-redirect"
-            , clientSecret = onedriveClientSecret
-            }
-      resp <- lift $ oauthTokenRequest req $ T.decodeUtf8 $ fromJust c
+            OauthTokenRequest (_onedriveClientId serverEnvironment) (_appBaseUrl serverEnvironment <> "/onedrive-redirect") onedriveClientSecret
+      resp <- lift $ requestToken req $ T.decodeUtf8 $ fromJust c
       void $ liftIO $ forkIO $ updateOnedriveInfoSync (_couchdbServer serverEnvironment) resp
-      setCookie "onedriveToken" (accessToken resp) defaultCookieSettings
+      setCookie "onedriveToken" (resp ^. Resp.accessToken) defaultCookieSettings
       redirect "/"
 
     get "server-environment" $
@@ -141,20 +140,20 @@ getPort =
   maybe 8000 read <$> lookupEnv "PORT"
 
 
-updateOnedriveInfoSync :: T.Text -> OauthTokenResponse -> IO ()
+updateOnedriveInfoSync :: T.Text -> Resp.OauthTokenResponse -> IO ()
 updateOnedriveInfoSync couchdbUrl resp = do
   let
-    tok = accessToken resp
+    tok =  resp ^. Resp.accessToken
   user <- me tok
-  updateOnedriveInfoIfNeeded couchdbUrl (OD.__id user) resp
+  updateOnedriveInfoIfNeeded couchdbUrl (user ^. id_) resp
 
 
-updateOnedriveInfoIfNeeded :: (MonadThrow m, MonadIO m) => T.Text -> T.Text -> OauthTokenResponse -> m ()
+updateOnedriveInfoIfNeeded :: (MonadThrow m, MonadIO m) => T.Text -> T.Text -> Resp.OauthTokenResponse -> m ()
 updateOnedriveInfoIfNeeded couchdbUrl userId tokenResp = do
   let
     databaseId = userDatabaseName userId
-    newToken = accessToken tokenResp
-    newRefreshToken = Common.Onedrive.refreshToken tokenResp
+    newToken = tokenResp ^. Resp.accessToken
+    newRefreshToken = tokenResp ^. Resp.refreshToken
   currentInfo <- getOnedriveInfo couchdbUrl databaseId
   when ((currentInfo ^. token) /= newToken || (currentInfo ^. Common.OnedriveInfo.refreshToken) /= newRefreshToken) $ do
     let

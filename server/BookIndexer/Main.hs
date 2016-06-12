@@ -10,7 +10,7 @@ import Onedrive.FolderChangesReader (newFolderChangesReader, enumerateChanges, g
 import Onedrive.Types.OnedriveItem (name)
 import Common.BooksDirectoryInfo (getBooksDirectoryInfo, booksItemId)
 import Common.Database (usersDatabaseName, indexerDatabaseName, userDatabaseName, usersFilter)
-import qualified Common.Onedrive as OD (oauthRefreshTokenRequest, OauthTokenRequest(..), OauthTokenResponse(..), getOnedriveClientSecret)
+import qualified Common.Onedrive as OD (getOnedriveClientSecret)
 import Common.OnedriveInfo (getOnedriveInfo, token, refreshToken)
 import Common.ServerEnvironmentInfo (getServerEnvironment, couchdbServer, onedriveClientId, appBaseUrl, ServerEnvironmentInfo)
 import Common.UserInfo (UserInfo)
@@ -34,6 +34,9 @@ import Data.Text (Text, unpack, takeEnd)
 import Network.HTTP.Client.Conduit (HttpException(StatusCodeException))
 import Network.HTTP.Simple (setRequestMethod, setRequestBodyJSON, parseRequest, httpJSON, getResponseBody, httpLBS)
 import Network.HTTP.Types.Status (notFound404, unauthorized401)
+import Onedrive.Auth (requestRefreshToken)
+import Onedrive.Types.OauthTokenRequest (OauthTokenRequest(OauthTokenRequest))
+import Onedrive.Types.OauthTokenResponse (OauthTokenResponse, accessToken)
 
 
 type UserSynchronizers =
@@ -153,16 +156,12 @@ synchronizeUserLoop userInfo = do
         tok =
           fromJust (onedriveInfo ^. refreshToken)
         req =
-          OD.OauthTokenRequest
-          { OD.clientId = env ^. onedriveClientId
-          , OD.redirectUri = (env ^. appBaseUrl) <> "/onedrive-redirect"
-          , OD.clientSecret = secret
-          }
-      resp <- OD.oauthRefreshTokenRequest req tok
+          OauthTokenRequest (env ^. onedriveClientId) ((env ^. appBaseUrl) <> "/onedrive-redirect") secret
+      resp <- requestRefreshToken req tok
       -- TODO update onedriveInfo in DB
       currentEnumerationToken <- getCurrentEnumerationToken oldReader
       booksDirectoryInfo <- getBooksDirectoryInfo couchdbUrl userDatabaseId
-      newFolderChangesReader (OD.accessToken resp) (booksDirectoryInfo ^. booksItemId) currentEnumerationToken
+      newFolderChangesReader (resp ^. accessToken) (booksDirectoryInfo ^. booksItemId) currentEnumerationToken
     logError :: (MonadThrow m, MonadIO m) => SomeException -> m a
     logError e = do
       liftIO $ print e

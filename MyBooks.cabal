@@ -44,7 +44,8 @@ executable MyBooks
                        directory,
                        filepath,
                        optparse-applicative,
-                       monad-control
+                       monad-control,
+                       hs-onedrive
   hs-source-dirs:      server
   default-language:    Haskell2010
 
