@@ -20,10 +20,11 @@ import qualified Data.Text.Encoding as T (decodeUtf8)
 import qualified Data.Text.Lazy as TL
 import Network.Wai (queryString)
 import qualified Network.Wai.Middleware.Static as Wai
-import Onedrive.Auth (requestToken, me)
+import Onedrive.Auth (requestToken)
 import Onedrive.Types.OauthTokenRequest (OauthTokenRequest(OauthTokenRequest))
 import qualified Onedrive.Types.OauthTokenResponse as Resp (OauthTokenResponse, refreshToken, accessToken)
 import Onedrive.Types.UserInfo (UserInfo, id_)
+import Onedrive.User (me)
 import System.Directory (getCurrentDirectory)
 import System.Environment (lookupEnv)
 import System.FilePath ((</>))
