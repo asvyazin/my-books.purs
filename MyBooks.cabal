@@ -70,6 +70,8 @@ executable BookIndexer
                                 conduit,
                                 conduit-combinators,
                                 conduit-extra,
+                                containers,
+                                epub-metadata,
                                 exceptions,
                                 hs-onedrive,
                                 http-conduit,

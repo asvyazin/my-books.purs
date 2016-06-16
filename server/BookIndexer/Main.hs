@@ -6,8 +6,8 @@ module Main (main) where
 import BookIndexer.CouchDB.Changes.Watcher (watchChanges, WatchParams(..), DocumentChange)
 import qualified BookIndexer.CouchDB.Changes.Watcher as W (_id)
 import BookIndexer.IndexerState (IndexerState(IndexerState), lastSeq, indexerStateId)
-import Onedrive.FolderChangesReader (newFolderChangesReader, enumerateChanges, getCurrentEnumerationToken)
-import Onedrive.Types.OnedriveItem (name)
+-- import Codec.Epub (getPkgPathXmlFromBS, getMetadata)
+-- import Codec.Epub.Data.Metadata (Metadata(..), Creator(..), Title(..))
 import Common.BooksDirectoryInfo (getBooksDirectoryInfo, booksItemId)
 import Common.Database (usersDatabaseName, indexerDatabaseName, userDatabaseName, usersFilter)
 import qualified Common.Onedrive as OD (getOnedriveClientSecret)
@@ -19,24 +19,34 @@ import Control.Concurrent.Async (Async, async)
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TVar (newTVar, modifyTVar, TVar)
 import Control.Exception.Base (SomeException)
-import Control.Lens ((^.), view, set)
-import Control.Monad (void, when)
+import Control.Lens ((^.), view, set, _Just)
+import Control.Monad (void, when, unless)
 import Control.Monad.Catch (MonadThrow(throwM), MonadCatch(catch), MonadMask)
+-- import Control.Monad.Error.Class (MonadError)
+-- import Control.Monad.Except (runExceptT)
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Reader (runReaderT)
 import Control.Monad.Reader.Class (MonadReader(ask))
+import Control.Monad.State (runStateT)
+import Control.Monad.State.Class (MonadState(get, put))
+-- import qualified Data.ByteString.Lazy as BL (toStrict)
 import Data.Conduit (($$), (=$=))
 import qualified Data.Conduit.Combinators as DC (last, mapM_, concatMapM)
 import Data.Int (Int64)
 import Data.Maybe (fromJust)
 import Data.Monoid ((<>))
-import Data.Text (Text, unpack, takeEnd)
+import qualified Data.Set as S (Set, member, insert, empty, singleton)
+import Data.Text (Text, unpack {-, takeEnd, intercalate, pack-})
 import Network.HTTP.Client.Conduit (HttpException(StatusCodeException))
 import Network.HTTP.Simple (setRequestMethod, setRequestBodyJSON, parseRequest, httpJSON, getResponseBody, httpLBS)
 import Network.HTTP.Types.Status (notFound404, unauthorized401)
 import Onedrive.Auth (requestRefreshToken)
+import Onedrive.FolderChangesReader (newFolderChangesReader, enumerateChanges, getCurrentEnumerationToken)
+-- import Onedrive.Items (item)
+import qualified Onedrive.Types.ItemReference as IR (id_)
+import Onedrive.Types.OnedriveItem (name, id_, parentReference, OnedriveItem)
 import Onedrive.Types.OauthTokenRequest (OauthTokenRequest(OauthTokenRequest))
-import Onedrive.Types.OauthTokenResponse (OauthTokenResponse, accessToken)
+import Onedrive.Types.OauthTokenResponse (accessToken)
 
 
 type UserSynchronizers =
@@ -138,12 +148,19 @@ synchronizeUserLoop userInfo = do
       userDatabaseName $ userInfo ^. U._id
   onedriveInfo <- getOnedriveInfo couchdbUrl userDatabaseId
   booksDirectoryInfo <- getBooksDirectoryInfo couchdbUrl userDatabaseId
-  onedriveReader <- newFolderChangesReader (onedriveInfo ^. token) (booksDirectoryInfo ^. booksItemId) Nothing
-  reauthorizeLoop readChanges doRefreshToken onedriveReader `catch` logError
+  let
+    tok =
+      onedriveInfo ^. token
+    booksFolder =
+      booksDirectoryInfo ^. booksItemId
+  liftIO $ putStrLn $ "Books itemId: " ++ show booksFolder
+  onedriveReader <- newFolderChangesReader tok booksFolder Nothing
+  void (runStateT (reauthorizeLoop readChanges doRefreshToken (onedriveReader, tok)) (S.empty, S.singleton booksFolder)) `catch` logError
   where
-    readChanges reader =
-      enumerateChanges reader $$ DC.mapM_ processItem
-    doRefreshToken oldReader = do
+    readChanges (reader, tok) =
+      enumerateChanges reader $$ DC.mapM_ (processItem tok)
+
+    doRefreshToken (oldReader, _) = do
       secret <- liftIO OD.getOnedriveClientSecret
       env <- ask
       let
@@ -161,21 +178,81 @@ synchronizeUserLoop userInfo = do
       -- TODO update onedriveInfo in DB
       currentEnumerationToken <- getCurrentEnumerationToken oldReader
       booksDirectoryInfo <- getBooksDirectoryInfo couchdbUrl userDatabaseId
-      newFolderChangesReader (resp ^. accessToken) (booksDirectoryInfo ^. booksItemId) currentEnumerationToken
+      let
+        newAccessToken =
+          resp ^. accessToken
+      newReader <- newFolderChangesReader newAccessToken (booksDirectoryInfo ^. booksItemId) currentEnumerationToken
+      return (newReader, newAccessToken)
+
     logError :: (MonadThrow m, MonadIO m) => SomeException -> m a
     logError e = do
       liftIO $ print e
       throwM e
-    processItem i =
+
+    processItem :: (MonadThrow m, MonadIO m, MonadState (S.Set Text, S.Set Text) m) => Text -> OnedriveItem -> m ()
+    processItem _ i = do
+      (readSet, processedSet) <- get 
+      unless (S.member (i ^. id_) processedSet) $ do
+        let
+          filename = i ^. name
+          parentItemId = i ^. parentReference . _Just . IR.id_
+        unless (S.member parentItemId processedSet) $
+          liftIO $ putStrLn $ "Parent itemId not found: " ++ show parentItemId
+        when (S.member parentItemId readSet) $
+          liftIO $ putStrLn $ "Read: " ++ show filename
+        let
+          newProcessedSet = S.insert (i ^. id_) processedSet
+          newReadSet =
+            if filename == "read" || S.member parentItemId readSet
+            then S.insert (i ^. id_) readSet
+            else readSet
+        put (newReadSet, newProcessedSet)
+      return ()
+
+
+    {-
+    processItem1 :: (MonadThrow m, MonadIO m) => Text -> OnedriveItem -> m ()
+    processItem1 tok i =
       when (isInterestingItem i) $ do
-        let filename = i ^. name
-        liftIO $ print filename
+        result <- runExceptT $ processEpubItem tok i
+        case result of
+          Right _ ->
+            return ()
+          Left strError ->
+            liftIO $ putStrLn $ "Error reading EPUB " ++ show (i ^. name) ++ ": " ++ strError
+
     isInterestingItem i =
       let
         filename = i ^. name
         ext = takeEnd 5 filename
       in
         ext == ".epub"
+
+    processEpubItem :: (MonadThrow m, MonadIO m, MonadError String m) => Text -> OnedriveItem -> m ()
+    processEpubItem tok i = do
+      let filename = i ^. name
+      c <- content tok $ i ^. id_
+      (_, xmlString) <- getPkgPathXmlFromBS $ BL.toStrict c
+      metadata <- getMetadata xmlString
+      liftIO $ print filename
+      liftIO $ putStrLn $ show (getAuthor metadata) ++ " - " ++ show (getTitle metadata)
+
+    getAuthor :: Metadata -> Text
+    getAuthor meta =
+      let
+        author =
+          intercalate ", " $ map (pack . creatorText) $ metaCreators meta
+      in
+        "(" <> author <> ")"
+
+    getTitle :: Metadata -> Text
+    getTitle meta =
+      let
+        title =
+          intercalate "; " $ map (pack . titleText) $ metaTitles meta
+      in
+        "[" <> title <> "]"
+   -}
 
 
 reauthorizeLoop :: (MonadCatch m) => (a -> m ()) -> (a -> m a) -> a -> m ()

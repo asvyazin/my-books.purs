@@ -23,7 +23,7 @@ import qualified Network.Wai.Middleware.Static as Wai
 import Onedrive.Auth (requestToken)
 import Onedrive.Types.OauthTokenRequest (OauthTokenRequest(OauthTokenRequest))
 import qualified Onedrive.Types.OauthTokenResponse as Resp (OauthTokenResponse, refreshToken, accessToken)
-import Onedrive.Types.UserInfo (UserInfo, id_)
+import Onedrive.Types.UserInfo (id_)
 import Onedrive.User (me)
 import System.Directory (getCurrentDirectory)
 import System.Environment (lookupEnv)
