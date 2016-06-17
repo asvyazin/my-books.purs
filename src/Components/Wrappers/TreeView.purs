@@ -1,8 +1,8 @@
 module Components.Wrappers.TreeView where
 
 
-import qualified React as R
-import qualified Thermite as T
+import React as R
+import Thermite as T
 
 
 type Props =

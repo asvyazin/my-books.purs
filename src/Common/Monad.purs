@@ -9,9 +9,9 @@ import Prelude
 
 guardMaybe :: forall m a e. (MonadError e m) => e -> Maybe a -> m a
 guardMaybe err =
-  maybe (throwError err) return
+  maybe (throwError err) pure
 
 
 guardEither :: forall m a e. (MonadError e m) => Either e a -> m a
 guardEither =
-  either throwError return
+  either throwError pure

@@ -1,5 +1,3 @@
-var PurescriptWebpackPlugin = require('purescript-webpack-plugin');
-
 var path = require('path');
 
 var modulesDirectories = [
@@ -18,7 +16,13 @@ module.exports = {
     module: {
 	loaders: [{
 	    test: /\.purs$/,
-	    loader: 'purs-loader'
+	    loader: 'purs-loader',
+	    exclude: /node_modules/,
+	    query: {
+		psc: 'psa',
+		src: ['bower_components/purescript-*/src/**/*.purs', 'src/**/*.purs'],
+		ffi: ['bower_components/purescript-*/src/**/*.js', 'src/**/*.js']
+	    }
 	}, {
 	    test: /\.js$/,
 	    exclude: /(node_modules|bower_components)/,
@@ -27,6 +31,5 @@ module.exports = {
     },
     resolve: {
 	modulesDirectories: modulesDirectories
-    },
-    plugins: [new PurescriptWebpackPlugin()]
+    }
 };

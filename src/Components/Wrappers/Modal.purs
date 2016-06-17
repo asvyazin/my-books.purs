@@ -1,7 +1,7 @@
 module Components.Wrappers.Modal where
 
 
-import qualified React as R
+import React as R
 
 
 foreign import modalFFI :: forall props. R.ReactClass props

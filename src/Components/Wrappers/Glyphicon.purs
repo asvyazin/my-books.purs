@@ -1,7 +1,7 @@
 module Components.Wrappers.Glyphicon where
 
 
-import qualified React as R
+import React as R
 
 
 type Props =

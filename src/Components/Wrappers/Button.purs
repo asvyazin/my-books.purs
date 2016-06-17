@@ -1,8 +1,7 @@
 module Components.Wrappers.Button where
 
 
-import Prelude
-import qualified React as R
+import React as R
 
 
 foreign import buttonFFI :: forall props. R.ReactClass props

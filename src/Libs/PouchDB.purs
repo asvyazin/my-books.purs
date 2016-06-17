@@ -67,9 +67,9 @@ foreign import tryGetFFI :: forall e. PouchDB -> String -> PouchDBCallbackFFI e 
 tryGet :: forall e a. PouchDB -> String -> PouchDBAff e (Maybe a)
 tryGet db docId = do
   foreignResult <- makeAff $ tryGetFFI db docId
-  return $ if isNull foreignResult
-           then Nothing
-           else Just $ unsafeFromForeign foreignResult
+  pure $ if isNull foreignResult
+         then Nothing
+         else Just $ unsafeFromForeign foreignResult
 
 
 foreign import data PouchDBSync :: *
