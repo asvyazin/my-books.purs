@@ -13,7 +13,7 @@ import Prelude
 
 newtype ServerEnvironmentInfo =
   ServerEnvironmentInfo
-  { appBaseUrl :: String
+  { baseUrl :: String
   , onedriveClientId :: String
   , couchdbServer :: String
   }
@@ -22,10 +22,10 @@ newtype ServerEnvironmentInfo =
 instance decodeJsonServerEnvironmentInfo :: DecodeJson ServerEnvironmentInfo where
   decodeJson json = do
     o <- toObject json ?>>= "Expected object"
-    appBaseUrl <- o .? "appBaseUrl"
+    baseUrl <- o .? "baseUrl"
     onedriveClientId <- o .? "onedriveClientId"
     couchdbServer <- o .? "couchdbServer"
-    return $ ServerEnvironmentInfo { appBaseUrl, onedriveClientId, couchdbServer }
+    return $ ServerEnvironmentInfo { baseUrl, onedriveClientId, couchdbServer }
 
 
 getServerEnvironment :: forall e. Aff (ajax :: AJAX | e) ServerEnvironmentInfo

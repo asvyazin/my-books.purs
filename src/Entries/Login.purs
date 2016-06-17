@@ -22,7 +22,7 @@ import Thermite as T
 
 type State =
   { clientId :: String
-  , appBaseUrl :: String
+  , baseUrl :: String
   }
 
 
@@ -37,7 +37,7 @@ component =
       (ServerEnvironmentInfo serverEnvironment) <- getServerEnvironment
       let newState =
             { clientId : serverEnvironment.onedriveClientId
-            , appBaseUrl : serverEnvironment.appBaseUrl
+            , baseUrl : serverEnvironment.baseUrl
             }
       liftEff $ R.transformState this (\_ -> Just newState)
 
@@ -74,7 +74,7 @@ loginButton =
       [ (Tuple "client_id" state.clientId)
       , (Tuple "scope" "wl.signin wl.offline_access onedrive.readonly")
       , (Tuple "response_type" "code")
-      , (Tuple "redirect_uri" (state.appBaseUrl <> "/onedrive-redirect"))
+      , (Tuple "redirect_uri" (state.baseUrl <> "/onedrive-redirect"))
       ]
 
     loginUrl =
