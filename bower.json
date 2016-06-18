@@ -12,12 +12,12 @@
   ],
   "dependencies": {
     "purescript-console": "^1.0.0",
-      "purescript-thermite": "https://github.com/paf31/purescript-thermite.git#337b3f9f59903c34d3e8b29aeb007a07dd43efe2",
-      "purescript-aff": "^1.0.0",
+    "purescript-thermite": "https://github.com/paf31/purescript-thermite.git#337b3f9f59903c34d3e8b29aeb007a07dd43efe2",
+    "purescript-aff": "^1.0.0",
     "purescript-affjax": "^0.13.2",
     "purescript-dom": "^1.0.0",
     "bootstrap": "^3.3.6",
-    "purescript-cookies": "^0.1.5",
+    "purescript-cookies": "https://github.com/asvyazin/purescript-cookies.git#8307ce3ab6e16ea0fa3c17a1b977ea0e87c2f834",
     "purescript-argonaut-codecs": "^1.0.0",
     "purescript-exceptions": "^1.0.0",
     "purescript-foreign": "^1.0.0",
@@ -25,7 +25,8 @@
     "purescript-errors": "^0.3.0",
     "bootstrap-theme-bootswatch-flatly": "^1.0.2",
     "purescript-react-dom": "^1.0.0",
-      "purescript-globals": "^1.0.0",
-      "purescript-profunctor-lenses": "^1.0.0"
+    "purescript-globals": "^1.0.0",
+    "purescript-profunctor-lenses": "^1.0.0",
+    "purescript-argonaut-core": "^1.0.0"
   }
 }
