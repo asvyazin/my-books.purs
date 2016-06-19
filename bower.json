@@ -14,7 +14,7 @@
     "purescript-console": "^1.0.0",
     "purescript-thermite": "https://github.com/paf31/purescript-thermite.git#337b3f9f59903c34d3e8b29aeb007a07dd43efe2",
     "purescript-aff": "^1.0.0",
-    "purescript-affjax": "^0.13.2",
+    "purescript-affjax": "https://github.com/thimoteus/purescript-affjax.git#86feb20387f7b918f09de7eab47f94b42e4be1ae",
     "purescript-dom": "^1.0.0",
     "bootstrap": "^3.3.6",
     "purescript-cookies": "https://github.com/asvyazin/purescript-cookies.git#8307ce3ab6e16ea0fa3c17a1b977ea0e87c2f834",

@@ -23,4 +23,4 @@ getJson resp = do
   when (resp.status /= StatusCode 200) $
     throwError $ error "AJAX request failed"
   let result = jsonParser resp.response >>= decodeJson
-  either (throwError <<< error) return result
+  either (throwError <<< error) pure result

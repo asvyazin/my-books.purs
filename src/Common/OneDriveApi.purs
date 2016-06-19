@@ -2,18 +2,20 @@ module Common.OneDriveApi where
 
 
 import Common.AjaxHelper (doJsonRequest)
+import Control.Error.Util (note)
 import Common.Json ((.??))
 import Control.Monad.Aff (Aff)
-import Data.Argonaut.Combinators ((.?), (?>>=))
 import Data.Argonaut.Core (toArray, toObject)
 import Data.Argonaut.Decode (class DecodeJson, decodeJson)
+import Data.Argonaut.Decode.Combinators ((.?))
+import Data.Either (Either(Left))
 import Data.Generic (class Generic)
+import Data.HTTP.Method (Method(GET))
 import Data.Maybe (Maybe, maybe)
 import Data.StrMap as M
 import Data.Traversable (traverse)
 import Global (encodeURIComponent)
 import Network.HTTP.Affjax (AJAX, defaultRequest, AffjaxRequest)
-import Network.HTTP.Method (Method(GET))
 import Network.HTTP.RequestHeader (RequestHeader(RequestHeader))
 import Prelude
 
@@ -27,10 +29,10 @@ newtype UserInfo =
 
 instance decodeJsonUserInfo :: DecodeJson UserInfo where
   decodeJson json = do
-    o <- toObject json ?>>= "Expected object"
+    o <- note "Expected object" $ toObject json
     _id <- o .? "id"
     displayName <- o .? "name"
-    return $ UserInfo { _id, displayName }
+    pure $ UserInfo { _id, displayName }
 
 
 getUserInfo :: forall e. String -> Aff (ajax :: AJAX | e) UserInfo
@@ -87,52 +89,52 @@ derive instance genericOneDriveItems :: Generic OneDriveItems
 
 instance decodeJsonOneDriveFolderFacet :: DecodeJson OneDriveFolderFacet where
   decodeJson json = do
-    o <- toObject json ?>>= "Expected object"
+    o <- note "Expected object" $ toObject json
     childCount <- o .? "childCount"
-    return $ OneDriveFolderFacet { childCount }
+    pure $ OneDriveFolderFacet { childCount }
 
 
 instance decodeJsonOneDriveFileFacet :: DecodeJson OneDriveFileFacet where
   decodeJson json = do
-    o <- toObject json ?>>= "Expected object"
+    o <- note "Expected object" $ toObject json
     mimeType <- o .? "mimeType"
-    return $ OneDriveFileFacet { mimeType }
+    pure $ OneDriveFileFacet { mimeType }
 
 
 instance decodeJsonOneDriveItemReference :: DecodeJson ItemReference where
   decodeJson json = do
-    o <- toObject json ?>>= "Expected object"
+    o <- note "Expected object" $ toObject json
     driveId <- o .? "driveId"
     id <- o .? "id"
     path <- o .? "path"
-    return $ ItemReference { driveId, id, path }
+    pure $ ItemReference { driveId, id, path }
 
 
 instance decodeJsonOneDriveItem :: DecodeJson OneDriveItem where
   decodeJson json = do
-    o <- toObject json ?>>= "Expected object"
+    o <- note "Expected object" $ toObject json
     id <- o .? "id"
     name <- o .? "name"
     folder <- o .?? "folder"
     file <- o .?? "file"
     parentReference <- o .?? "parentReference"
-    return $ OneDriveItem { id, name, folder, file, parentReference }
+    pure $ OneDriveItem { id, name, folder, file, parentReference }
 
 
 instance decodeJsonOneDriveItems :: DecodeJson OneDriveItems where
   decodeJson json = do
-    o <- toObject json ?>>= "Expected object"
-    jValue <- M.lookup "value" o ?>>= "Expected 'value'"
-    jArr <- toArray jValue ?>>= "Expected array"
+    o <- note "Expected object" $ toObject json
+    jValue <- note "Expected 'value'" $ M.lookup "value" o
+    jArr <- note "Expected array" $ toArray jValue
     value <- traverse decodeJson jArr
-    return $ OneDriveItems { value }
+    pure $ OneDriveItems { value }
 
 
 getChildrenByItemId :: forall e. String -> Maybe String -> Aff (ajax :: AJAX | e) (Array OneDriveItem)
 getChildrenByItemId token itemId =
   let
     url =
-      maybe "/drive/root/children" (\x -> "/drive/items/" ++ x ++ "/children") itemId
+      maybe "/drive/root/children" (\x -> "/drive/items/" <> x <> "/children") itemId
   in
    getOneDriveItems token url
 
@@ -141,7 +143,7 @@ getChildrenByItemPath :: forall e. String -> Maybe String -> Aff (ajax :: AJAX |
 getChildrenByItemPath token itemPath =
   let
     url =
-      maybe "/drive/root/children" (\x -> "/drive/root:/" ++ x ++ ":/children") itemPath
+      maybe "/drive/root/children" (\x -> "/drive/root:/" <> x <> ":/children") itemPath
   in
    getOneDriveItems token url
 
@@ -159,7 +161,7 @@ getOneDriveItem :: forall e. String -> Maybe String -> Aff (ajax :: AJAX | e) On
 getOneDriveItem token itemId = do
   let
     url =
-      maybe "/drive/root" ("/drive/items/" ++ _) itemId
+      maybe "/drive/root" ("/drive/items/" <> _) itemId
     req =
       onedriveGetRequest token url
   doJsonRequest req
@@ -167,12 +169,12 @@ getOneDriveItem token itemId = do
 
 onedriveGetRequest :: String -> String -> AffjaxRequest Unit
 onedriveGetRequest token url =
-  getRequest token $ onedriveApiBaseUrl ++ url
+  getRequest token $ onedriveApiBaseUrl <> url
 
 
 graphGetRequest :: String -> String -> AffjaxRequest Unit
 graphGetRequest token url =
-  getRequestTokenInUrl token $ graphApiBaseUrl ++ url
+  getRequestTokenInUrl token $ graphApiBaseUrl <> url
 
 
 getRequest :: String -> String -> AffjaxRequest Unit
@@ -180,7 +182,7 @@ getRequest token url =
   defaultRequest
   { method = GET
   , url = url
-  , headers = [ RequestHeader "Authorization" ("Bearer " ++ token) ]
+  , headers = [ RequestHeader "Authorization" ("Bearer " <> token) ]
   }
 
 
@@ -188,7 +190,7 @@ getRequestTokenInUrl :: String -> String -> AffjaxRequest Unit
 getRequestTokenInUrl token url =
   defaultRequest
   { method = GET
-  , url = url ++ "?access_token=" ++ encodeURIComponent token
+  , url = url <> "?access_token=" <> encodeURIComponent token
   }
 
 

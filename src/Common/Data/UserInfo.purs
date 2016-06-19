@@ -2,13 +2,14 @@ module Common.Data.UserInfo where
 
 
 import Common.Json ((.??), withRev)
+import Control.Error.Util (note)
 import Data.Argonaut.Core (toObject, jsonEmptyObject)
 import Data.Argonaut.Decode (class DecodeJson)
 import Data.Argonaut.Decode.Combinators ((.?))
 import Data.Argonaut.Encode (class EncodeJson)
 import Data.Argonaut.Encode.Combinators ((:=), (~>))
 import Data.Either (Either(Left))
-import Data.Maybe (Maybe, maybe)
+import Data.Maybe (Maybe)
 import Prelude
 
 
@@ -21,14 +22,12 @@ newtype UserInfo =
 
 
 instance decodeJsonUserInfo :: DecodeJson UserInfo where
-  decodeJson json =
-    maybe (Left "Expected object") decode $ toObject json
-    where
-      decode o = do
-        _id <- o .? "_id"
-        _rev <- o .?? "_rev"
-        displayName <- o .? "displayName"
-        pure $ UserInfo { _id, _rev, displayName }
+  decodeJson json = do
+    o <- note "Expected object" $ toObject json
+    _id <- o .? "_id"
+    _rev <- o .?? "_rev"
+    displayName <- o .? "displayName"
+    pure $ UserInfo { _id, _rev, displayName }
 
 
 instance encodeJsonUserInfo :: EncodeJson UserInfo where
