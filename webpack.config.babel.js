@@ -1,16 +1,16 @@
-var path = require('path');
+import path from 'path';
 
-var modulesDirectories = [
+const modulesDirectories = [
   'node_modules',
   'bower_components'
 ];
 
-module.exports = {
+export default {
     entry: {
 	app: './js/App.js'
     },
     output: {
-	path: path.resolve(__dirname, "public/js"),
+	path: path.resolve(__dirname, "public"),
 	filename: '[name].bundle.js'
     },
     module: {
@@ -20,6 +20,7 @@ module.exports = {
 	    exclude: /node_modules/,
 	    query: {
 		psc: 'psa',
+		pscArgs: { sourceMaps: true },
 		src: ['bower_components/purescript-*/src/**/*.purs', 'src/**/*.purs'],
 		ffi: ['bower_components/purescript-*/src/**/*.js', 'src/**/*.js']
 	    }
@@ -31,5 +32,6 @@ module.exports = {
     },
     resolve: {
 	modulesDirectories: modulesDirectories
-    }
+    },
+    devtool: 'source-map'
 };
