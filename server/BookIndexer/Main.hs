@@ -194,14 +194,17 @@ synchronizeUserLoop userInfo = do
       (readSet, processedSet) <- get 
       unless (S.member (i ^. id_) processedSet) $ do
         let
-          filename = i ^. name
-          parentItemId = i ^. parentReference . _Just . IR.id_
+          filename =
+            i ^. name
+          parentItemId =
+            i ^. parentReference . _Just . IR.id_
         unless (S.member parentItemId processedSet) $
           liftIO $ putStrLn $ "Parent itemId not found: " ++ show parentItemId
         when (S.member parentItemId readSet) $
           liftIO $ putStrLn $ "Read: " ++ show filename
         let
-          newProcessedSet = S.insert (i ^. id_) processedSet
+          newProcessedSet =
+            S.insert (i ^. id_) processedSet
           newReadSet =
             if filename == "read" || S.member parentItemId readSet
             then S.insert (i ^. id_) readSet
