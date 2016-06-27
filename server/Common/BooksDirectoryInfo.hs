@@ -21,6 +21,7 @@ data BooksDirectoryInfo =
   { booksDirectoryInfoId_ :: Text
   , booksDirectoryInfoRev :: Maybe Text
   , booksDirectoryInfoBooksItemId :: Text
+  , booksDirectoryInfoReadItemId :: Text
   } deriving (Show)
 
 
@@ -29,7 +30,11 @@ makeLensesWith camelCaseFields ''BooksDirectoryInfo
 
 instance FromJSON BooksDirectoryInfo where
   parseJSON (Object o) =
-    BooksDirectoryInfo <$> o .: "_id" <*> o .:? "_rev" <*> o .: "booksItemId"
+    BooksDirectoryInfo
+    <$> o .: "_id"
+    <*> o .:? "_rev"
+    <*> o .: "booksItemId"
+    <*> o .: "readItemId"
   parseJSON _ =
     error "Invalid BooksDirectoryInfo JSON"
 

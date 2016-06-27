@@ -17,6 +17,7 @@ newtype BooksDirectoryInfo =
   { _id :: String
   , _rev :: Maybe String
   , booksItemId :: Maybe String
+  , readItemId :: Maybe String
   }
 
 
@@ -25,13 +26,14 @@ instance decodeJsonBooksDirectoryInfo :: DecodeJson BooksDirectoryInfo where
     o <- note "Expected object" $ toObject json
     _id <- o .? "_id"
     _rev <- o .?? "_rev"
-    booksItemId <- o .? "booksItemId"
-    pure $ BooksDirectoryInfo { _id, _rev, booksItemId }
+    booksItemId <- o .?? "booksItemId"
+    readItemId <- o .?? "readItemId"
+    pure $ BooksDirectoryInfo { _id, _rev, booksItemId, readItemId }
 
 
 instance encodeJsonBooksDirectoryInfo :: EncodeJson BooksDirectoryInfo where
   encodeJson (BooksDirectoryInfo info) =
-    ("_id" := info._id) ~> ("booksItemId" := info.booksItemId) ~> jsonEmptyObject `withRev` info._rev
+    ("_id" := info._id) ~> ("booksItemId" := info.booksItemId) ~> ("readItemId" := info.readItemId) ~> jsonEmptyObject `withRev` info._rev
 
 
 booksDirectoryInfoId :: String
@@ -44,4 +46,5 @@ defaultBooksDirectoryInfo =
   { _id : booksDirectoryInfoId
   , _rev : Nothing
   , booksItemId : Nothing
+  , readItemId : Nothing
   }
