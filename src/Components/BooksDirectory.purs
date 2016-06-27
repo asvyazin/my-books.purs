@@ -126,14 +126,14 @@ spec =
     tryGetChoosedDirectoryProps p s = do
       dir <- s.directory
       db <- p.db
-      return { directoryPath: dir.path
-             }
+      pure { directoryPath: dir.path
+           }
 
     tryGetChooseDirectoryModalProps p = do
       db <- p.db
-      return { onedriveToken: p.onedriveToken
-             , db
-             }
+      pure { onedriveToken: p.onedriveToken
+           , db
+           }
 
     performAction (ChooseDirectoryModal.FileTreeAction action) props state update =
       processFileTreeAction action props state update
@@ -143,7 +143,7 @@ spec =
     processFileTreeAction action props state update =
       case FileTree.unwrapChildAction action of
         Tuple itemId FileTree.SelectDirectory ->
-          launchAff $ do
+          void $ launchAff $ do
             (liftEff' $ update $ \s -> s { directory = Nothing, stateLoaded = false }) >>= guardEither
             dir <- getDirectoryInfo props.onedriveToken itemId
             (liftEff' $ update $ \s -> s { directory = Just dir, stateLoaded = true }) >>= guardEither
@@ -158,7 +158,7 @@ reactClass =
     reactSpec =
       T.createReactSpec spec defaultState
 
-    componentDidMount this = launchAff $ do
+    componentDidMount this = void $ launchAff $ do
       props <- liftEff $ R.getProps this
       dir <- runMaybeT $ do
         db <- hoistMaybe props.db
@@ -176,7 +176,9 @@ getDirectoryInfo :: forall e. String -> Maybe String -> Aff (ajax :: AJAX | e) D
 getDirectoryInfo token itemId = do
   item <- getItem <$> getOneDriveItem token itemId
   let parentPath = fromMaybe "" (getPath <$> item.parentReference)
-  return { itemId, path: parentPath ++ "/" ++ item.name }
+  pure { itemId
+       , path : parentPath <> "/" <> item.name
+       }
   where
     getItem (OneDriveItem item) = item
     getPath (ItemReference reference) =

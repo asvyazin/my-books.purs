@@ -8,7 +8,8 @@ import Components.Wrappers.Button as Button
 import Components.Wrappers.Glyphicon as Glyphicon
 import Control.Monad.Aff (launchAff)
 import Control.Monad.Eff.Class (liftEff)
-import Data.List (List(..), fromList, toList)
+import Data.Array (fromFoldable) as A
+import Data.List (List(..), fromFoldable)
 import Data.Maybe (Maybe(..))
 import Data.String (joinWith)
 import Data.Tuple (Tuple(Tuple))
@@ -33,7 +34,7 @@ component =
     reactSpec =
       T.createReactSpec spec Nothing
     
-    componentDidMount this = launchAff $ do
+    componentDidMount this = void $ launchAff $ do
       (ServerEnvironmentInfo serverEnvironment) <- getServerEnvironment
       let newState =
             { clientId : serverEnvironment.onedriveClientId
@@ -78,17 +79,17 @@ loginButton =
       ]
 
     loginUrl =
-      buildUrl "https://login.live.com/oauth20_authorize.srf" <<< toList <<< loginParams
+      buildUrl "https://login.live.com/oauth20_authorize.srf" <<< fromFoldable <<< loginParams
 
 
 buildUrl :: String -> List (Tuple String String) -> String
 buildUrl baseUrl Nil =
   baseUrl
 buildUrl baseUrl params =
-  baseUrl ++ "?" ++ queryString
+  baseUrl <> "?" <> queryString
   where
     formatParam (Tuple p v) =
-      encodeURIComponent p ++ "=" ++ encodeURIComponent v
+      encodeURIComponent p <> "=" <> encodeURIComponent v
 
     queryString =
-      joinWith "&" $ fromList $ map formatParam params
+      joinWith "&" $ A.fromFoldable $ map formatParam params

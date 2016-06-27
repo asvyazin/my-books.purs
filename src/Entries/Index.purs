@@ -8,7 +8,6 @@ import Common.React (mapProps)
 import Components.AjaxLoader as AjaxLoader
 import Components.BooksDirectory as BooksDirectory
 import Components.Header as Header
-import Control.Monad (when)
 import Control.Monad.Aff (launchAff, Aff)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
@@ -81,7 +80,7 @@ component =
       case maybeOnedriveToken of
         Nothing ->
           redirect "/login"
-        Just onedriveToken -> launchAff $
+        Just onedriveToken -> void $ launchAff $
           (do
               (ServerEnvironmentInfo serverEnvironment) <- getServerEnvironment
               u@(UserInfo userInfo) <- getUserInfo onedriveToken

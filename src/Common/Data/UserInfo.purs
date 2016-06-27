@@ -8,7 +8,6 @@ import Data.Argonaut.Decode (class DecodeJson)
 import Data.Argonaut.Decode.Combinators ((.?))
 import Data.Argonaut.Encode (class EncodeJson)
 import Data.Argonaut.Encode.Combinators ((:=), (~>))
-import Data.Either (Either(Left))
 import Data.Maybe (Maybe)
 import Prelude
 

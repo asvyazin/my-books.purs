@@ -1,9 +1,9 @@
 module Common.Monad where
 
 
-import Control.Monad.Error.Class
-import Data.Either
-import Data.Maybe
+import Control.Monad.Error.Class (class MonadError, throwError)
+import Data.Either (Either, either)
+import Data.Maybe (Maybe, maybe)
 import Prelude
 
 

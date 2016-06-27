@@ -7,7 +7,6 @@ import Common.React (mapProps)
 import Components.OneDriveFileTree as FileTree
 import Components.Wrappers.Button as Button
 import Components.Wrappers.Modal as Modal
-import Control.Monad (when)
 import Control.Monad.Aff (launchAff, liftEff')
 import Control.Monad.Eff.Exception (EXCEPTION)
 import Data.Foldable (fold)
@@ -98,7 +97,7 @@ spec =
     performAction (FileTreeAction action) props state update =
       case FileTree.unwrapChildAction action of
         Tuple itemId FileTree.SelectDirectory ->
-          launchAff $ do
+          void $ launchAff $ do
             updateBooksDirectoryIfNeeded props.db itemId
             (liftEff' $ update $ \x -> x { show = false }) >>= guardEither
         _ ->

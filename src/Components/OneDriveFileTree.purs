@@ -9,7 +9,6 @@ import Components.Wrappers.Alert as Alert
 import Components.Wrappers.Glyphicon as Glyphicon
 import Components.Wrappers.TreeView as TreeView
 import Control.Error.Util (hoistMaybe)
-import Control.Monad (when)
 import Control.Monad.Aff (launchAff, liftEff')
 import Control.Monad.Eff.Exception (EXCEPTION)
 import Control.Monad.Maybe.Trans (lift, runMaybeT)
@@ -17,7 +16,7 @@ import Data.Array (zip, (!!), findIndex, updateAt, filter, zipWith)
 import Data.Foldable (foldl, fold)
 import Data.Lens (PrismP, LensP, view, over, prism', _2, set, lens)
 import Data.Maybe (Maybe(Nothing, Just), fromMaybe, isJust)
-import Data.Monoid (mempty)
+import Data.Monoid (mempty, (<>))
 import Data.Tuple (Tuple(Tuple), fst)
 import Network.HTTP.Affjax (AJAX())
 import Prelude
@@ -112,7 +111,7 @@ wrapTreeView =
           [ RP.onClick $ const $ dispatch $ SelectDirectory ]
 
         itemLabel =
-          R.span itemProps [ glyphicon, R.text $ " " ++ p.name ]
+          R.span itemProps [ glyphicon, R.text $ " " <> p.name ]
       in
        [ TreeView.treeview
          { collapsed: s.collapsed
@@ -145,7 +144,7 @@ spec =
   ]
   where
     performAction ToggleCollapsed props (State state) update =
-      launchAff performActionAff
+      void $ launchAff performActionAff
       where
         performActionAff =
           if (not state.collapsed)

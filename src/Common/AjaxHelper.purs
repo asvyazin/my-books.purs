@@ -1,7 +1,6 @@
 module Common.AjaxHelper where
 
 
-import Control.Monad (when)
 import Control.Monad.Aff (Aff)
 import Control.Monad.Eff.Exception (Error, error)
 import Control.Monad.Error.Class (class MonadError, throwError)

@@ -7,8 +7,8 @@ import Control.Monad.Aff (Aff)
 import Data.Argonaut.Core (toObject)
 import Data.Argonaut.Decode.Combinators ((.?))
 import Data.Argonaut.Decode (class DecodeJson)
+import Data.Either (Either(Left))
 import Data.HTTP.Method (Method(GET))
-import Data.Maybe (maybe)
 import Network.HTTP.Affjax (AJAX, defaultRequest)
 import Prelude
 
@@ -33,6 +33,6 @@ instance decodeJsonServerEnvironmentInfo :: DecodeJson ServerEnvironmentInfo whe
 getServerEnvironment :: forall e. Aff (ajax :: AJAX | e) ServerEnvironmentInfo
 getServerEnvironment =
   doJsonRequest $ defaultRequest
-  { method = GET
+  { method = Left GET
   , url = "/server-environment"
   }

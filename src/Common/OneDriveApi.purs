@@ -180,7 +180,7 @@ graphGetRequest token url =
 getRequest :: String -> String -> AffjaxRequest Unit
 getRequest token url =
   defaultRequest
-  { method = GET
+  { method = Left GET
   , url = url
   , headers = [ RequestHeader "Authorization" ("Bearer " <> token) ]
   }
@@ -189,7 +189,7 @@ getRequest token url =
 getRequestTokenInUrl :: String -> String -> AffjaxRequest Unit
 getRequestTokenInUrl token url =
   defaultRequest
-  { method = GET
+  { method = Left GET
   , url = url <> "?access_token=" <> encodeURIComponent token
   }
 

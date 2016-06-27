@@ -4,7 +4,6 @@ module Entries.App.Class where
 import Components.Wrappers.Router (router, route, browserHistory)
 import Entries.Index as Index
 import Entries.Login as Login
-import Prelude
 import React as R
 import Thermite as T
 
