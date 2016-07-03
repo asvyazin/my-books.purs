@@ -11,8 +11,8 @@ mapProps :: forall props1 props2 eff state action. (props1 -> props2) -> T.Spec 
 mapProps convert spec2 =
   T.simpleSpec performAction render
   where
-    performAction a p1 s update =
-      view T._performAction spec2 a (convert p1) s update
+    performAction a p1 s =
+      view T._performAction spec2 a (convert p1) s
 
     render dispatch p1 s children =
       view T._render spec2 dispatch (convert p1) s children
@@ -22,8 +22,8 @@ mapPropsWithState :: forall props1 props2 eff state action. (props1 -> state -> 
 mapPropsWithState convert spec2 =
   T.simpleSpec performAction render
   where
-    performAction a p1 s update =
-      view T._performAction spec2 a (convert p1 s) s update
+    performAction a p1 s =
+      view T._performAction spec2 a (convert p1 s) s
 
     render dispatch p1 s children =
       view T._render spec2 dispatch (convert p1 s) s children
@@ -33,8 +33,8 @@ withProps :: forall eff props state action. (props -> T.Spec eff state props act
 withProps f =
   T.simpleSpec performAction render
   where
-    performAction a p s u =
-      view T._performAction (f p) a p s u
+    performAction a p s =
+      view T._performAction (f p) a p s
     render d p s c =
       view T._render (f p) d p s c
 

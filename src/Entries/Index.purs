@@ -5,7 +5,7 @@ import Common.Data.ServerEnvironmentInfo (ServerEnvironmentInfo(..), getServerEn
 import Common.Data.UserInfo as U
 import Common.OneDriveApi (getUserInfo, UserInfo(UserInfo))
 import Common.React (mapProps)
-import Components.AjaxLoader as AjaxLoader
+import Components.AjaxLoader.AjaxLoader as AjaxLoader
 import Components.BooksDirectory as BooksDirectory
 import Components.Header as Header
 import Control.Monad.Aff (launchAff, Aff)

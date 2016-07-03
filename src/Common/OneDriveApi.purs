@@ -11,6 +11,7 @@ import Data.Argonaut.Decode.Combinators ((.?))
 import Data.Either (Either(Left))
 import Data.Generic (class Generic)
 import Data.HTTP.Method (Method(GET))
+import Data.List (List, fromFoldable)
 import Data.Maybe (Maybe, maybe)
 import Data.StrMap as M
 import Data.Traversable (traverse)
@@ -68,7 +69,7 @@ newtype OneDriveItem =
 
 newtype OneDriveItems =
   OneDriveItems
-  { value :: Array OneDriveItem
+  { value :: List OneDriveItem
   }
 
 
@@ -126,11 +127,11 @@ instance decodeJsonOneDriveItems :: DecodeJson OneDriveItems where
     o <- note "Expected object" $ toObject json
     jValue <- note "Expected 'value'" $ M.lookup "value" o
     jArr <- note "Expected array" $ toArray jValue
-    value <- traverse decodeJson jArr
+    value <- traverse decodeJson $ fromFoldable jArr
     pure $ OneDriveItems { value }
 
 
-getChildrenByItemId :: forall e. String -> Maybe String -> Aff (ajax :: AJAX | e) (Array OneDriveItem)
+getChildrenByItemId :: forall e. String -> Maybe String -> Aff (ajax :: AJAX | e) (List OneDriveItem)
 getChildrenByItemId token itemId =
   let
     url =
@@ -139,7 +140,7 @@ getChildrenByItemId token itemId =
    getOneDriveItems token url
 
 
-getChildrenByItemPath :: forall e. String -> Maybe String -> Aff (ajax :: AJAX | e) (Array OneDriveItem)
+getChildrenByItemPath :: forall e. String -> Maybe String -> Aff (ajax :: AJAX | e) (List OneDriveItem)
 getChildrenByItemPath token itemPath =
   let
     url =
@@ -148,7 +149,7 @@ getChildrenByItemPath token itemPath =
    getOneDriveItems token url
 
 
-getOneDriveItems :: forall e. String -> String -> Aff (ajax :: AJAX | e) (Array OneDriveItem)
+getOneDriveItems :: forall e. String -> String -> Aff (ajax :: AJAX | e) (List OneDriveItem)
 getOneDriveItems token url = do
   let req = onedriveGetRequest token url
   getItems <$> doJsonRequest req

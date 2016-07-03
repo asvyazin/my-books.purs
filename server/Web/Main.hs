@@ -67,18 +67,7 @@ main = do
   serverEnvironment <- getServerEnvironment
   runSpock port $ spockT id $ do
     currentDirectory <- liftIO getCurrentDirectory
-    let policy =
-          Wai.only [ ("bootstrap/css/bootstrap.min.css", currentDirectory </> "bower_components" </> "bootstrap-theme-bootswatch-flatly" </> "css" </> "bootstrap.min.css")
-                   , ("bootstrap/fonts/glyphicons-halflings-regular.eot", currentDirectory </> "bower_components" </> "bootstrap" </> "dist" </> "fonts" </> "glyphicons-halflings-regular.eot")
-                   , ("bootstrap/fonts/glyphicons-halflings-regular.svg", currentDirectory </> "bower_components" </> "bootstrap" </> "dist" </> "fonts" </> "glyphicons-halflings-regular.svg")
-                   , ("bootstrap/fonts/glyphicons-halflings-regular.ttf", currentDirectory </> "bower_components" </> "bootstrap" </> "dist" </> "fonts" </> "glyphicons-halflings-regular.ttf")
-                   , ("bootstrap/fonts/glyphicons-halflings-regular.woff", currentDirectory </> "bower_components" </> "bootstrap" </> "dist" </> "fonts" </> "glyphicons-halflings-regular.woff")
-                   , ("bootstrap/fonts/glyphicons-halflings-regular.woff2", currentDirectory </> "bower_components" </> "bootstrap" </> "dist" </> "fonts" </> "glyphicons-halflings-regular.woff2")
-                   , ("react-treeview/css/react-treeview.css", currentDirectory </> "node_modules" </> "react-treeview" </> "react-treeview.css")
-                   , ("js/app.bundle.js", currentDirectory </> "public" </> "js" </> "app.bundle.js")
-                   , ("images/ajax-loader.gif", currentDirectory </> "images" </> "ajax-loader.gif")
-                   ]
-    middleware $ Wai.staticPolicy policy
+    middleware $ Wai.staticPolicy (Wai.addBase (currentDirectory </> "public"))
   
     get "onedrive-redirect" $ do
       qs <- queryString <$> request
@@ -110,7 +99,7 @@ renderHtml =
 
 appPage :: H.Html
 appPage =
-  withMaster "/js/app.bundle.js" $ H.div H.! HA.class_ "application" $ ""
+  withMaster "/app.bundle.js" $ H.div H.! HA.class_ "application" $ ""
 
 
 withMaster :: T.Text -> H.Html -> H.Html

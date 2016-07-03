@@ -28,6 +28,15 @@ export default {
 	    test: /\.js$/,
 	    exclude: /(node_modules|bower_components)/,
 	    loader: 'babel'
+	}, {
+	    test: /\.css$/,
+	    loader: "style-loader!css-loader"
+	}, {
+	    test: /\.png$/,
+	    loader: "url-loader?limit=100000"
+	}, {
+	    test: /\.(jpg|eot|svg|ttf|woff|woff2)$/,
+	    loader: "file-loader"
 	}]
     },
     resolve: {
