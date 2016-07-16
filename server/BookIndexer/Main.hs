@@ -8,7 +8,7 @@ import qualified BookIndexer.CouchDB.Changes.Watcher as W (_id)
 import BookIndexer.IndexerState (IndexerState(IndexerState), lastSeq, indexerStateId)
 -- import Codec.Epub (getPkgPathXmlFromBS, getMetadata)
 -- import Codec.Epub.Data.Metadata (Metadata(..), Creator(..), Title(..))
-import Common.BooksDirectoryInfo (getBooksDirectoryInfo, booksItemId)
+import Common.BooksDirectoryInfo (getBooksDirectoryInfo, booksItemId, readItemId)
 import Common.Database (usersDatabaseName, indexerDatabaseName, userDatabaseName, usersFilter)
 import qualified Common.Onedrive as OD (getOnedriveClientSecret)
 import Common.OnedriveInfo (getOnedriveInfo, token, refreshToken)
@@ -153,9 +153,11 @@ synchronizeUserLoop userInfo = do
       onedriveInfo ^. token
     booksFolder =
       booksDirectoryInfo ^. booksItemId
+    readFolder =
+      booksDirectoryInfo ^. readItemId
   liftIO $ putStrLn $ "Books itemId: " ++ show booksFolder
   onedriveReader <- newFolderChangesReader tok booksFolder Nothing
-  void (runStateT (reauthorizeLoop readChanges doRefreshToken (onedriveReader, tok)) (S.empty, S.singleton booksFolder)) `catch` logError
+  void (runStateT (reauthorizeLoop readChanges doRefreshToken (onedriveReader, tok)) (S.singleton readFolder, S.singleton booksFolder)) `catch` logError
   where
     readChanges (reader, tok) =
       enumerateChanges reader $$ DC.mapM_ (processItem tok)
@@ -191,23 +193,26 @@ synchronizeUserLoop userInfo = do
 
     processItem :: (MonadThrow m, MonadIO m, MonadState (S.Set Text, S.Set Text) m) => Text -> OnedriveItem -> m ()
     processItem _ i = do
-      (readSet, processedSet) <- get 
-      unless (S.member (i ^. id_) processedSet) $ do
-        let
-          filename =
-            i ^. name
-          parentItemId =
-            i ^. parentReference . _Just . IR.id_
+      (readSet, processedSet) <- get
+      let
+        currentId =
+          i ^. id_
+        filename =
+          i ^. name
+        parentItemId =
+          i ^. parentReference . _Just . IR.id_
+
+      unless (S.member currentId processedSet) $ do
         unless (S.member parentItemId processedSet) $
           liftIO $ putStrLn $ "Parent itemId not found: " ++ show parentItemId
         when (S.member parentItemId readSet) $
           liftIO $ putStrLn $ "Read: " ++ show filename
         let
           newProcessedSet =
-            S.insert (i ^. id_) processedSet
+            S.insert currentId processedSet
           newReadSet =
-            if filename == "read" || S.member parentItemId readSet
-            then S.insert (i ^. id_) readSet
+            if S.member parentItemId readSet
+            then S.insert currentId readSet
             else readSet
         put (newReadSet, newProcessedSet)
       return ()
