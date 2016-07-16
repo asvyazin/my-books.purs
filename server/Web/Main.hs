@@ -107,8 +107,6 @@ withMaster mainScript childrenMarkup = H.docTypeHtml $ do
   H.head $ do
     H.meta H.! HA.charset "UTF-8"
     H.title "My Books"
-    H.link H.! HA.rel "stylesheet" H.! HA.type_ "text/css" H.! HA.href "/bootstrap/css/bootstrap.min.css"
-    H.link H.! HA.rel "stylesheet" H.! HA.type_ "text/css" H.! HA.href "/react-treeview/css/react-treeview.css"
   H.body $ do
     ie10comment $ H.p H.! HA.class_ "browserupgrade" $ do
       H.text "You are using an "

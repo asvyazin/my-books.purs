@@ -1,6 +1,8 @@
 module Common.React where
 
 
+import Control.Coroutine (transformCoTransformL, transformCoTransformR, transform)
+import Control.Monad.Rec.Class (forever)
 import Data.Lens (view)
 import Data.Maybe (Maybe(..))
 import Prelude
@@ -43,12 +45,15 @@ maybeState :: forall eff props state action. T.Spec eff state props action -> T.
 maybeState origSpec =
   T.simpleSpec performAction render
   where
-    performAction a p s u =
+    performAction a p s =
       case s of
         Nothing ->
           pure unit
         Just s' ->
-          view T._performAction origSpec a p s' (u <<< map)
+          forever (transform (_ >>= id))
+          `transformCoTransformL` view T._performAction origSpec a p s'
+          `transformCoTransformR` forever (transform map)
+
     render d p s c =
       case s of
         Nothing ->
@@ -61,12 +66,12 @@ maybeProps :: forall eff props state action. T.Spec eff state props action -> T.
 maybeProps origSpec =
   T.simpleSpec performAction render
   where
-    performAction a p s u =
+    performAction a p s =
       case p of
         Nothing ->
           pure unit
         Just p' ->
-          view T._performAction origSpec a p' s u
+          view T._performAction origSpec a p' s
     render d p s c =
       case p of
         Nothing ->

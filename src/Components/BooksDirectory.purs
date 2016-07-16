@@ -3,13 +3,14 @@ module Components.BooksDirectory (booksDirectory) where
 
 import Common.Data.BooksDirectoryInfo (BooksDirectoryInfo(BooksDirectoryInfo), booksDirectoryInfoId, defaultBooksDirectoryInfo)
 import Common.OneDriveApi (ItemReference(..), OneDriveItem(..), getOneDriveItem)
-import Common.React (maybeProps, mapProps, mapPropsWithState)
+import Common.React (maybeProps, mapProps)
 import Components.AjaxLoader.AjaxLoader as AjaxLoader
-import Components.ChoosedDirectory as ChoosedDirectory
 import Components.ChooseDirectoryModal as ChooseDirectoryModal
 import Components.OneDriveFileTree as FileTree
 import Components.Wrappers.Button as Button
-import Components.Wrappers.Glyphicon as Glyphicon
+import Components.Wrappers.ControlLabel as ControlLabel
+import Components.Wrappers.FormControl as FormControl
+import Components.Wrappers.FormGroup as FormGroup
 import Control.Coroutine (cotransform)
 import Control.Monad.Aff (Aff, launchAff)
 import Control.Monad.Eff.Class (liftEff)
@@ -18,7 +19,7 @@ import Control.Monad.Maybe.Trans (runMaybeT)
 import Control.Monad.Trans (lift)
 import Control.Error.Util (hoistMaybe)
 import Data.Foldable (fold)
-import Data.Lens (LensP, over, lens, PrismP, prism')
+import Data.Lens (LensP, over, lens, PrismP, prism', set, _Just, (^.))
 import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.String as S
 import Data.Tuple (Tuple(..))
@@ -27,8 +28,7 @@ import Libs.PouchDB.Json (tryGetJson, putJson)
 import Network.HTTP.Affjax (AJAX)
 import Prelude
 import React (ReactElement, ReactClass, createElement, createClass, transformState, getProps) as R
-import React.DOM (text, div) as R
-import React.DOM.Props as RP
+import React.DOM (text, form) as R
 import Thermite as T
 
 
@@ -39,12 +39,37 @@ type Props =
 
 
 type State =
-  { booksModal :: ChooseDirectoryModal.State
-  , booksDir :: Maybe DirectoryInfo
-  , readModal :: ChooseDirectoryModal.State
+  { booksDir :: Maybe DirectoryInfo
   , readDir :: Maybe DirectoryInfo
   , stateLoaded :: Boolean
+  , booksModal :: ChooseDirectoryModal.State
+  , readModal :: ChooseDirectoryModal.State
   }
+
+
+booksDir :: LensP State (Maybe DirectoryInfo)
+booksDir =
+  lens _.booksDir (_ { booksDir = _ })
+
+
+readDir :: LensP State (Maybe DirectoryInfo)
+readDir =
+  lens _.readDir (_ { readDir = _ })
+
+
+stateLoaded :: LensP State Boolean
+stateLoaded =
+  lens _.stateLoaded (_ { stateLoaded = _ })
+
+
+booksModal :: LensP State ChooseDirectoryModal.State
+booksModal =
+  lens _.booksModal (_ { booksModal = _ })
+
+
+readModal :: LensP State ChooseDirectoryModal.State
+readModal =
+  lens _.readModal (_ { readModal = _ })
 
 
 type DirectoryInfo =
@@ -53,114 +78,109 @@ type DirectoryInfo =
   }
 
 
-booksModal :: LensP State ChooseDirectoryModal.State
-booksModal =
-  lens _.booksModal (_ { booksModal = _ })
-
-
-booksDir :: LensP State (Maybe DirectoryInfo)
-booksDir =
-  lens _.booksDir (_ { booksDir = _ })
-
-
-readModal :: LensP State ChooseDirectoryModal.State
-readModal =
-  lens _.readModal (_ { readModal = _ })
-
-
-readDir :: LensP State (Maybe DirectoryInfo)
-readDir =
-  lens _.readDir (_ { readDir = _ })
+itemId_ :: LensP DirectoryInfo (Maybe String)
+itemId_ =
+  lens _.itemId (_ { itemId = _ })
 
 
 defaultState :: State
 defaultState =
-  { booksModal: ChooseDirectoryModal.defaultState
-  , readModal: ChooseDirectoryModal.defaultState
-  , stateLoaded: false
+  { stateLoaded: false
   , booksDir: Nothing
   , readDir: Nothing
+  , booksModal: ChooseDirectoryModal.defaultState
+  , readModal: ChooseDirectoryModal.defaultState
   }
 
 
 data Action
-  = BooksDirectory ChooseDirectoryModal.Action
-  | ReadDirectory ChooseDirectoryModal.Action
+  = BooksModalAction ChooseDirectoryModal.Action
+  | ReadModalAction ChooseDirectoryModal.Action
   | Save
 
 
-booksDirectoryAction :: PrismP Action ChooseDirectoryModal.Action
-booksDirectoryAction =
-  prism' BooksDirectory getBooksDirectory
+booksModalAction :: PrismP Action ChooseDirectoryModal.Action
+booksModalAction =
+  prism' BooksModalAction getModal
   where
-    getBooksDirectory (BooksDirectory x) = Just x
-    getBooksDirectory _ = Nothing
+    getModal (BooksModalAction x) = Just x
+    getModal _ = Nothing
 
 
-readDirectoryAction :: PrismP Action ChooseDirectoryModal.Action
-readDirectoryAction =
-  prism' ReadDirectory getBooksDirectory
+readModalAction :: PrismP Action ChooseDirectoryModal.Action
+readModalAction =
+  prism' ReadModalAction getModel
   where
-    getBooksDirectory (ReadDirectory x) = Just x
-    getBooksDirectory _ = Nothing
+    getModel (ReadModalAction x) = Just x
+    getModel _ = Nothing
 
 
-wrapMiddle :: forall eff state props action. T.Spec eff state props action -> T.Spec eff state props action
-wrapMiddle =
-  over T._render wrapRender
-  where
-    wrapRender origRender dispatch p s c =
-      [ R.div
-        [ RP.className "col-md-offset-5" ]
-        (origRender dispatch p s c)
-      ]
-
-
-chooseButton :: forall eff. T.Spec eff State Props Action
-chooseButton =
-  wrapMiddle $ T.simpleSpec T.defaultPerformAction render
-  where
-    render :: T.Render State Props Action
-    render dispatch _ _ _ =
-      let
-        buttonProps =
-          { bsSize : "large"
-          , onClick : dispatch $ BooksDirectory ChooseDirectoryModal.ShowModal
-          }
-      in
-       [ Button.button buttonProps
-         [ R.div
-           [ RP.className "col-md-2" ]
-           [ Glyphicon.glyphicon' "book"
-           , R.text " Choose books directory..."
-           ]
-         ]
-       ]
-
-
-spec :: forall eff. T.Spec (ajax :: AJAX, err :: EXCEPTION, pouchdb :: POUCHDB | eff) State Props Action
+spec :: forall eff. T.Spec (ajax :: AJAX, pouchdb :: POUCHDB, err :: EXCEPTION | eff) State Props Action
 spec =
   fold
-  [ T.withState (\st ->
-                  if not st.stateLoaded
-                  then AjaxLoader.spec
-                  else
-                    case st.booksDir of
-                      Nothing ->
-                        chooseButton
-                      Just _ ->
-                        wrapMiddle $ mapPropsWithState tryGetChoosedDirectoryProps $ maybeProps $ T.match booksDirectoryAction $ ChoosedDirectory.spec
-                )
+  [ T.withState $ \st ->
+                    if not st.stateLoaded
+                    then
+                      AjaxLoader.spec
+                    else
+                      wrapForm $ booksDirectoryGroup <> readDirectoryGroup <> saveButton
   , T.simpleSpec performAction T.defaultRender
-  , mapProps tryGetChooseDirectoryModalProps $ maybeProps $ T.focus booksModal booksDirectoryAction ChooseDirectoryModal.spec
-  , mapProps tryGetChooseDirectoryModalProps $ maybeProps $ T.focus readModal readDirectoryAction ChooseDirectoryModal.spec
+  , mapProps tryGetChooseDirectoryModalProps $ maybeProps $ T.focus booksModal booksModalAction ChooseDirectoryModal.spec
+  , mapProps tryGetChooseDirectoryModalProps $ maybeProps $ T.focus readModal readModalAction ChooseDirectoryModal.spec
   ]
   where
-    tryGetChoosedDirectoryProps p s = do
-      dir <- s.booksDir
-      db <- p.db
-      pure { directoryPath: dir.path
-           }
+    booksDirectoryGroup =
+      wrapFormGroup (Just "booksDirectory") $ T.simpleSpec T.defaultPerformAction render
+      where
+        render dispatch _ s _ =
+          [ ControlLabel.controlLabel {} [ R.text "Books directory" ]
+          , renderDirectoryInfo "Books directory placeholder" s.booksDir
+          , Button.button { bsStyle: "link", onClick: dispatch (BooksModalAction ChooseDirectoryModal.ShowModal) } [ R.text "Choose directory" ]
+          ]
+
+    readDirectoryGroup =
+      wrapFormGroup (Just "readDirectory") $ T.simpleSpec T.defaultPerformAction render
+      where
+        render dispatch _ s _ =
+          [ ControlLabel.controlLabel {} [ R.text "Read directory" ]
+          , renderDirectoryInfo "Read directory placeholder" s.readDir
+          , Button.button { bsStyle: "link", onClick: dispatch (ReadModalAction ChooseDirectoryModal.ShowModal) } [ R.text "Choose directory" ]
+          ]
+
+    saveButton =
+      T.simpleSpec T.defaultPerformAction render
+      where
+        render dispatch _ _ _ =
+          [ Button.button { type: "submit", onClick: dispatch Save } [ R.text "Save" ] ]
+
+    performAction Save props state =
+      void $ runMaybeT $ do
+        db <- hoistMaybe props.db
+        let
+          booksItemId =
+            state ^. (booksDir <<< _Just <<< itemId_)
+          readItemId =
+            state ^. (readDir <<< _Just <<< itemId_)
+        lift $ lift $ updateBooksDirectoryIfNeeded db booksItemId readItemId
+    performAction (BooksModalAction (ChooseDirectoryModal.FileTreeAction action)) props _ =
+      case FileTree.unwrapChildAction action of
+        Tuple itemId FileTree.SelectDirectory ->
+          updateItemId props booksDir itemId
+        _ ->
+          pure unit
+    performAction (ReadModalAction (ChooseDirectoryModal.FileTreeAction action)) props _ =
+      case FileTree.unwrapChildAction action of
+        Tuple itemId FileTree.SelectDirectory ->
+          updateItemId props readDir itemId
+        _ ->
+          pure unit
+    performAction _ _ _ =
+      pure unit
+
+    updateItemId props dirSetter itemId = do
+      void $ cotransform $ set dirSetter Nothing <<< set stateLoaded false
+      dir <- lift $ getDirectoryInfo props.onedriveToken itemId
+      void $ cotransform $ set dirSetter (Just dir) <<< set stateLoaded true
 
     tryGetChooseDirectoryModalProps p = do
       db <- p.db
@@ -168,30 +188,31 @@ spec =
            , db
            }
 
-    performAction (BooksDirectory (ChooseDirectoryModal.FileTreeAction action)) props state =
-      processFileTreeAction1 action props state
-    performAction (ReadDirectory (ChooseDirectoryModal.FileTreeAction action)) props state =
-      processFileTreeAction2 action props state
-    performAction _ _ _ =
-      pure unit
+    renderDirectoryInfo placeholder maybeDirInfo =
+      FormControl.formControlStatic {} [ R.text (maybe placeholder _.path maybeDirInfo) ]
 
-    processFileTreeAction1 action props state =
-      case FileTree.unwrapChildAction action of
-        Tuple itemId FileTree.SelectDirectory -> do
-          void $ cotransform $ \s -> s { booksDir = Nothing, stateLoaded = false }
-          dir <- lift $ getDirectoryInfo props.onedriveToken itemId
-          void $ cotransform $ \s -> s { booksDir = Just dir, stateLoaded = true }
-        _ ->
-          pure unit
 
-    processFileTreeAction2 action props state =
-      case FileTree.unwrapChildAction action of
-        Tuple itemId FileTree.SelectDirectory -> do
-          void $ cotransform $ \s -> s { readDir = Nothing, stateLoaded = false }
-          dir <- lift $ getDirectoryInfo props.onedriveToken itemId
-          void $ cotransform $ \s -> s { readDir = Just dir, stateLoaded = true }
-        _ ->
-          pure unit
+wrapForm :: forall eff state props action. T.Spec eff state props action -> T.Spec eff state props action
+wrapForm =
+  over T._render wrapRender
+  where
+    wrapRender origRender dispatch p s c =
+      [ R.form
+        [ ]
+        (origRender dispatch p s c)
+      ]
+
+
+wrapFormGroup :: forall eff state props action. Maybe String -> T.Spec eff state props action -> T.Spec eff state props action
+wrapFormGroup controlId =
+  over T._render wrapRender
+  where
+    wrapRender origRender dispatch p s c =
+      let
+        fg =
+          maybe (FormGroup.formGroup {}) (\c -> FormGroup.formGroup { controlId: c }) controlId
+      in
+        [ fg $ origRender dispatch p s c ]
 
 
 reactClass :: R.ReactClass Props
@@ -232,8 +253,10 @@ getDirectoryInfo token itemId = do
        maybe reference.path (\i -> S.drop (i + 1) reference.path) idx
 
 
-updateBooksDirectoryIfNeeded :: forall e. PouchDB -> Maybe String -> PouchDBAff e Unit
-updateBooksDirectoryIfNeeded db itemId = do
+updateBooksDirectoryIfNeeded :: forall e. PouchDB -> Maybe String -> Maybe String -> PouchDBAff e Unit
+updateBooksDirectoryIfNeeded db booksItemId readItemId = do
   BooksDirectoryInfo current <- fromMaybe defaultBooksDirectoryInfo <$> tryGetJson db booksDirectoryInfoId
-  when (current.booksItemId /= itemId) $
-    putJson db $ BooksDirectoryInfo current { booksItemId = itemId }
+  when (current.booksItemId /= booksItemId || current.readItemId /= readItemId) $
+    putJson db $ BooksDirectoryInfo current { booksItemId = booksItemId
+                                            , readItemId = readItemId
+                                            }

@@ -12,7 +12,7 @@
   ],
   "dependencies": {
     "purescript-console": "^1.0.0",
-    "purescript-thermite": "^1.0.0",
+    "purescript-thermite": "https://github.com/paf31/purescript-thermite.git#5dddb494403ad1e456a5b165151292a199c4c1e6",
     "purescript-aff": "^1.0.0",
     "purescript-affjax": "^1.0.0",
     "purescript-dom": "^1.0.0",

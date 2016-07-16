@@ -1,28 +1,29 @@
 module Components.OneDriveFileTree where
 
 
-import Prelude
 import Components.AjaxLoader.AjaxLoader as AjaxLoader
 import Components.Wrappers.Alert as Alert
 import Components.Wrappers.Glyphicon as Glyphicon
 import Components.Wrappers.TreeView as TreeView
-import React.DOM.Props as RP
-import Thermite as T
 import Common.OneDriveApi (OneDriveItem(OneDriveItem), getChildrenByItemId)
 import Common.React (mapPropsWithState)
 import Control.Coroutine (transform, transformCoTransformL, transformCoTransformR, cotransform)
 import Control.Error.Util (hoistMaybe)
 import Control.Monad.Eff.Exception (EXCEPTION)
-import Control.Monad.Maybe.Trans (lift, runMaybeT)
+import Control.Monad.Maybe.Trans (runMaybeT, lift)
+import Control.Monad.Rec.Class (forever)
 import Data.Foldable (foldl, fold)
-import Data.Lens (PrismP, LensP, view, over, prism', _2, set, lens, (^.))
+import Data.Lens (PrismP, LensP, view, over, prism', _2, set, lens, (^.), IsoP, iso)
 import Data.List (fromFoldable, (!!), modifyAt, findIndex, List, zip, zipWith, filter, null)
 import Data.Maybe (Maybe(Nothing, Just), fromMaybe, isJust)
 import Data.Monoid (mempty, (<>))
 import Data.Tuple (Tuple(Tuple), fst)
 import Network.HTTP.Affjax (AJAX)
+import Prelude
 import React (ReactElement, createElement) as R
 import React.DOM (text, span) as R
+import React.DOM.Props as RP
+import Thermite as T
 
 
 type Props =
@@ -33,8 +34,7 @@ type Props =
   }
 
 
-newtype State =
-  State
+type StateT =
   { collapsed :: Boolean
   , loaded :: Boolean
   , errorText :: Maybe String
@@ -42,24 +42,34 @@ newtype State =
   }
 
 
-children :: LensP State (List (Tuple Props State))
-children =
-  lens getChildren setChildren
+newtype State = State StateT 
+
+
+_State :: IsoP State StateT
+_State =
+  iso getState State
   where
-    getChildren (State s) =
-      s.children
-    setChildren (State s) c =
-      State s { children = c }
+    getState (State s) = s
 
 
-errorText :: LensP State (Maybe String)
+collapsed :: LensP StateT Boolean
+collapsed =
+  lens _.collapsed (_ { collapsed = _ })
+
+
+loaded :: LensP StateT Boolean
+loaded =
+  lens _.loaded (_ { loaded = _ })
+
+
+errorText :: LensP StateT (Maybe String)
 errorText =
-  lens getErrorText setErrorText
-  where
-    getErrorText (State s) =
-      s.errorText
-    setErrorText (State s) e =
-      State s { errorText = e }
+  lens _.errorText (_ { errorText = _ })
+
+
+children :: LensP StateT (List (Tuple Props State))
+children =
+  lens _.children (_ { children = _ })
 
 
 mapZip :: forall a b. LensP a b -> LensP (List a) (List b)
@@ -69,7 +79,7 @@ mapZip l =
 
 childrenState :: LensP State (List State)
 childrenState =
-  children <<< mapZip _2
+  _State <<< children <<< mapZip _2
 
 
 data Action
@@ -128,7 +138,7 @@ spec =
   , wrapTreeView $ T.withState (\ (State st) ->
                                  case st.errorText of
                                    Just error ->
-                                     T.focusState errorText Alert.spec
+                                     T.focusState (_State <<< errorText) Alert.spec
                                    Nothing ->
                                      if not st.loaded
                                      then
@@ -144,26 +154,27 @@ spec =
   where
     performAction ToggleCollapsed props (State state) =
       if (not state.collapsed)
-      then
-        void $ cotransform $ \(State s) -> State s { collapsed = true }
-      else do
-        void $ cotransform $ \(State s) -> State s { collapsed = false }
-        when (not state.loaded) $ do
-          childrenData <- lift $ getChildrenByItemId props.onedriveToken props.itemId
-          let
-            newChildren =
-              map child $ filter isDirectory childrenData
-          void $ cotransform $ \(State s) -> State s { collapsed = false, loaded = true, children = newChildren }
-            where
-              child :: OneDriveItem -> Tuple Props State
-              child (OneDriveItem item) =
-                Tuple
-                { onedriveToken: props.onedriveToken
-                , name: item.name
-                , itemId: Just item.id
-                , key: item.id
-                }
-                defaultState
+        then
+        void $ cotransform $ set (_State <<< collapsed) true
+        else
+        void $ runMaybeT $ do
+          State s' <- (lift $ cotransform $ set (_State <<< collapsed) false) >>= hoistMaybe
+          when (not s'.loaded) $ do
+            childrenData <- lift $ lift $ getChildrenByItemId props.onedriveToken props.itemId
+            let
+              newChildren =
+                map child $ filter isDirectory childrenData
+            void $ lift $ cotransform $ set (_State <<< loaded) true <<< set (_State <<< children) newChildren
+              where
+                child :: OneDriveItem -> Tuple Props State
+                child (OneDriveItem item) =
+                  Tuple
+                  { onedriveToken: props.onedriveToken
+                  , name: item.name
+                  , itemId: Just item.id
+                  , key: item.id
+                  }
+                  defaultState
               
     performAction _ _ _ =
       pure unit
@@ -181,9 +192,9 @@ childrenSpec origSpec =
         idx <- hoistMaybe $ findIndex (\x -> x.itemId == itemId) propsArr
         childProps <- hoistMaybe $ propsArr !! idx
         childState <- hoistMaybe $ stateArr !! idx
-        lift $ transform (_ >>= (_ !! idx))
+        lift $ forever (transform (_ >>= (_ !! idx)))
           `transformCoTransformL` view T._performAction origSpec action childProps childState
-          `transformCoTransformR` transform (modifying idx)
+          `transformCoTransformR` forever (transform (modifying idx))
       where
         modifying :: Int -> (State -> State) -> List State -> List State
         modifying i f sts' = fromMaybe sts' (modifyAt i f sts')
