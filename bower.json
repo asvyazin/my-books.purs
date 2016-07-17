@@ -12,6 +12,7 @@
   ],
   "dependencies": {
     "purescript-console": "^1.0.0",
+    "purescript-coroutines": "https://github.com/purescript-contrib/purescript-coroutines.git#45309618bd8b50ecab214b6ac18c6ace7ef988a1",
     "purescript-thermite": "https://github.com/paf31/purescript-thermite.git#5dddb494403ad1e456a5b165151292a199c4c1e6",
     "purescript-aff": "^1.0.0",
     "purescript-affjax": "^1.0.0",
