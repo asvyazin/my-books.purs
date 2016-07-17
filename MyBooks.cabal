@@ -74,6 +74,7 @@ executable BookIndexer
                                 epub-metadata,
                                 exceptions,
                                 hs-onedrive,
+                                http-client,
                                 http-conduit,
                                 http-types,
                                 lens,

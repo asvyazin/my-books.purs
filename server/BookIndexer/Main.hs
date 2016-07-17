@@ -37,12 +37,13 @@ import Data.Maybe (fromJust)
 import Data.Monoid ((<>))
 import qualified Data.Set as S (Set, member, insert, empty, singleton)
 import Data.Text (Text, unpack {-, takeEnd, intercalate, pack-})
-import Network.HTTP.Client.Conduit (HttpException(StatusCodeException))
-import Network.HTTP.Simple (setRequestMethod, setRequestBodyJSON, parseRequest, httpJSON, getResponseBody, httpLBS)
-import Network.HTTP.Types.Status (notFound404, unauthorized401)
+import Network.HTTP.Client (responseCookieJar)
+import Network.HTTP.Simple (setRequestMethod, setRequestBodyJSON, parseRequest, httpJSON, httpJSONEither, getResponseBody, httpLBS, getResponseStatus, getResponseHeaders, HttpException(StatusCodeException))
+import Network.HTTP.Types.Status (notFound404, unauthorized401, status200)
 import Onedrive.Auth (requestRefreshToken)
 import Onedrive.FolderChangesReader (newFolderChangesReader, enumerateChanges, getCurrentEnumerationToken)
 -- import Onedrive.Items (item)
+import Onedrive.Session (newSessionWithRenewableToken)
 import qualified Onedrive.Types.ItemReference as IR (id_)
 import Onedrive.Types.OnedriveItem (name, id_, parentReference, OnedriveItem)
 import Onedrive.Types.OauthTokenRequest (OauthTokenRequest(OauthTokenRequest))
@@ -71,17 +72,20 @@ main = do
           setIndexerState $ newIndexerState state newLastSeq
 
 
-getIndexerState :: (MonadCatch m, MonadIO m, MonadReader ServerEnvironmentInfo m) => m (Maybe IndexerState)
+getIndexerState :: (MonadThrow m, MonadIO m, MonadReader ServerEnvironmentInfo m) => m (Maybe IndexerState)
 getIndexerState = do
   req <- parseRequest =<< getObjectUrl indexerDatabaseName indexerStateId
-  (getResponseBody <$> httpJSON req) `catch` handleError
-  where
-    handleError :: (MonadThrow m) => HttpException -> m (Maybe IndexerState)
-    handleError e@(StatusCodeException code _ _) =
-      if code == notFound404
-      then return Nothing
-      else throwM e
-    handleError e = throwM e
+  resp <- httpJSONEither req
+  let responseStatus = getResponseStatus resp
+  if responseStatus == status200
+    then
+    case getResponseBody resp of
+      Left e -> throwM e
+      Right res -> return $ Just res
+    else
+    if responseStatus == notFound404
+    then return Nothing
+    else throwM $ StatusCodeException responseStatus (getResponseHeaders resp) (responseCookieJar resp)
 
 
 setIndexerState :: (MonadThrow m, MonadIO m, MonadReader ServerEnvironmentInfo m) => IndexerState -> m ()
@@ -156,13 +160,12 @@ synchronizeUserLoop userInfo = do
     readFolder =
       booksDirectoryInfo ^. readItemId
   liftIO $ putStrLn $ "Books itemId: " ++ show booksFolder
-  onedriveReader <- newFolderChangesReader tok booksFolder Nothing
-  void (runStateT (reauthorizeLoop readChanges doRefreshToken (onedriveReader, tok)) (S.singleton readFolder, S.singleton booksFolder)) `catch` logError
+  serverEnv <- ask
+  session <- liftIO $ newSessionWithRenewableToken tok (runReaderT renewToken serverEnv)
+  onedriveReader <- newFolderChangesReader session booksFolder Nothing
+  void (runStateT (enumerateChanges onedriveReader $$ DC.mapM_ (processItem tok)) (S.singleton readFolder, S.singleton booksFolder)) `catch` logError
   where
-    readChanges (reader, tok) =
-      enumerateChanges reader $$ DC.mapM_ (processItem tok)
-
-    doRefreshToken (oldReader, _) = do
+    renewToken = do
       secret <- liftIO OD.getOnedriveClientSecret
       env <- ask
       let
@@ -177,14 +180,7 @@ synchronizeUserLoop userInfo = do
         req =
           OauthTokenRequest (env ^. onedriveClientId) ((env ^. appBaseUrl) <> "/onedrive-redirect") secret
       resp <- requestRefreshToken req tok
-      -- TODO update onedriveInfo in DB
-      currentEnumerationToken <- getCurrentEnumerationToken oldReader
-      booksDirectoryInfo <- getBooksDirectoryInfo couchdbUrl userDatabaseId
-      let
-        newAccessToken =
-          resp ^. accessToken
-      newReader <- newFolderChangesReader newAccessToken (booksDirectoryInfo ^. booksItemId) currentEnumerationToken
-      return (newReader, newAccessToken)
+      return $ resp ^. accessToken
 
     logError :: (MonadThrow m, MonadIO m) => SomeException -> m a
     logError e = do
@@ -261,22 +257,3 @@ synchronizeUserLoop userInfo = do
       in
         "[" <> title <> "]"
    -}
-
-
-reauthorizeLoop :: (MonadCatch m) => (a -> m ()) -> (a -> m a) -> a -> m ()
-reauthorizeLoop worker reauthorizeHandler context = do
-  needReauthorize <- iteration
-  when needReauthorize $ do
-    newContext <- reauthorizeHandler context
-    reauthorizeLoop worker reauthorizeHandler newContext
-  where
-    iteration =
-      (worker context >> return False) `catch` handleError
-    handleError :: (MonadThrow m) => HttpException -> m Bool
-    handleError e@(StatusCodeException statusCode _ _ )
-      | statusCode == unauthorized401 =
-        return True
-      | otherwise =
-        throwM e
-    handleError e =
-      throwM e
