@@ -163,7 +163,12 @@ synchronizeUserLoop userInfo = do
   serverEnv <- ask
   session <- liftIO $ newSessionWithRenewableToken tok (runReaderT renewToken serverEnv)
   onedriveReader <- newFolderChangesReader session booksFolder Nothing
-  void (runStateT (enumerateChanges onedriveReader $$ DC.mapM_ (processItem tok)) (S.singleton readFolder, S.singleton booksFolder)) `catch` logError
+  let
+    loop =
+      enumerateChanges onedriveReader $$ DC.mapM_ (processItem tok)
+    startState =
+      (S.singleton readFolder, S.singleton booksFolder)
+  void (runStateT loop startState) `catch` logError
   where
     renewToken = do
       secret <- liftIO OD.getOnedriveClientSecret

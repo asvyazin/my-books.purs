@@ -14,6 +14,7 @@ cabal-version:       >=1.10
 
 executable MyBooks
   main-is:             Web/Main.hs
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   other-modules:       Common.Database,
                        Common.HTTPHelper,
                        Common.JSONHelper,
@@ -51,6 +52,7 @@ executable MyBooks
 
 executable BookIndexer
            main-is:             BookIndexer/Main.hs
+           ghc-options:         -threaded -rtsopts -with-rtsopts=-N
            other-modules:       BookIndexer.CouchDB.Changes.Watcher,
                                 BookIndexer.IndexerState,
                                 Common.BooksDirectoryInfo,
