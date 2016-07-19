@@ -5,7 +5,9 @@ module Main (main) where
 
 import BookIndexer.CouchDB.Changes.Watcher (watchChanges, WatchParams(..), DocumentChange)
 import qualified BookIndexer.CouchDB.Changes.Watcher as W (_id)
+import BookIndexer.CouchDB.Requests (getObject, putObject)
 import BookIndexer.IndexerState (IndexerState(IndexerState), lastSeq, indexerStateId)
+import BookIndexer.Types.BookInfo (BookInfo(BookInfo), read_)
 -- import Codec.Epub (getPkgPathXmlFromBS, getMetadata)
 -- import Codec.Epub.Data.Metadata (Metadata(..), Creator(..), Title(..))
 import Common.BooksDirectoryInfo (getBooksDirectoryInfo, booksItemId, readItemId)
@@ -18,9 +20,10 @@ import qualified Common.UserInfo as U (_id)
 import Control.Concurrent.Async (Async, async)
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TVar (newTVar, modifyTVar, TVar)
+import Control.Error.Util (hoistMaybe)
 import Control.Exception.Base (SomeException)
 import Control.Lens ((^.), view, set, _Just)
-import Control.Monad (void, when, unless)
+import Control.Monad (void, unless, when)
 import Control.Monad.Catch (MonadThrow(throwM), MonadCatch(catch), MonadMask)
 -- import Control.Monad.Error.Class (MonadError)
 -- import Control.Monad.Except (runExceptT)
@@ -29,23 +32,21 @@ import Control.Monad.Reader (runReaderT)
 import Control.Monad.Reader.Class (MonadReader(ask))
 import Control.Monad.State (runStateT)
 import Control.Monad.State.Class (MonadState(get, put))
+import Control.Monad.Trans.Maybe (runMaybeT)
 -- import qualified Data.ByteString.Lazy as BL (toStrict)
 import Data.Conduit (($$), (=$=))
 import qualified Data.Conduit.Combinators as DC (last, mapM_, concatMapM)
 import Data.Int (Int64)
-import Data.Maybe (fromJust)
+import Data.Maybe (fromJust, isNothing)
 import Data.Monoid ((<>))
-import qualified Data.Set as S (Set, member, insert, empty, singleton)
-import Data.Text (Text, unpack {-, takeEnd, intercalate, pack-})
-import Network.HTTP.Client (responseCookieJar)
-import Network.HTTP.Simple (setRequestMethod, setRequestBodyJSON, parseRequest, httpJSON, httpJSONEither, getResponseBody, httpLBS, getResponseStatus, getResponseHeaders, HttpException(StatusCodeException))
-import Network.HTTP.Types.Status (notFound404, unauthorized401, status200)
+import qualified Data.Set as S (Set, member, insert, singleton)
+import Data.Text (Text, {-, takeEnd, intercalate, pack-})
 import Onedrive.Auth (requestRefreshToken)
-import Onedrive.FolderChangesReader (newFolderChangesReader, enumerateChanges, getCurrentEnumerationToken)
+import Onedrive.FolderChangesReader (newFolderChangesReader, enumerateChanges)
 -- import Onedrive.Items (item)
 import Onedrive.Session (newSessionWithRenewableToken)
 import qualified Onedrive.Types.ItemReference as IR (id_)
-import Onedrive.Types.OnedriveItem (name, id_, parentReference, OnedriveItem)
+import Onedrive.Types.OnedriveItem (name, id_, parentReference, OnedriveItem, folder)
 import Onedrive.Types.OauthTokenRequest (OauthTokenRequest(OauthTokenRequest))
 import Onedrive.Types.OauthTokenResponse (accessToken)
 
@@ -58,10 +59,10 @@ main :: IO ()
 main = do
   serverEnv <- getServerEnvironment
   userSynchronizers <- atomically $ newTVar []
-  runReaderT (runMain  userSynchronizers) serverEnv
+  runReaderT (runMain userSynchronizers) serverEnv
   where
     runMain userSynchronizers = do
-      state <- getIndexerState
+      state <- getObject indexerDatabaseName indexerStateId
       let
         ls = view lastSeq <$> state
       maybeNewLastSeq <- watchNewUsersLoop userSynchronizers ls
@@ -69,32 +70,7 @@ main = do
         Nothing ->
           return ()
         Just newLastSeq ->
-          setIndexerState $ newIndexerState state newLastSeq
-
-
-getIndexerState :: (MonadThrow m, MonadIO m, MonadReader ServerEnvironmentInfo m) => m (Maybe IndexerState)
-getIndexerState = do
-  req <- parseRequest =<< getObjectUrl indexerDatabaseName indexerStateId
-  resp <- httpJSONEither req
-  let responseStatus = getResponseStatus resp
-  if responseStatus == status200
-    then
-    case getResponseBody resp of
-      Left e -> throwM e
-      Right res -> return $ Just res
-    else
-    if responseStatus == notFound404
-    then return Nothing
-    else throwM $ StatusCodeException responseStatus (getResponseHeaders resp) (responseCookieJar resp)
-
-
-setIndexerState :: (MonadThrow m, MonadIO m, MonadReader ServerEnvironmentInfo m) => IndexerState -> m ()
-setIndexerState indexerState = do
-  initReq <- parseRequest =<< getObjectUrl indexerDatabaseName indexerStateId
-  let
-    req =
-      setRequestMethod "PUT" $ setRequestBodyJSON indexerState initReq
-  void $ httpLBS req
+          putObject indexerDatabaseName indexerStateId $ newIndexerState state newLastSeq
 
 
 newIndexerState :: Maybe IndexerState -> Int64 -> IndexerState
@@ -117,23 +93,17 @@ watchNewUsersLoop userSynchronizers ls = do
 
 
 processWatchItem :: (MonadIO m, MonadReader ServerEnvironmentInfo m, MonadThrow m) => UserSynchronizers -> DocumentChange -> m (Maybe Int64)
-processWatchItem userSynchronizers documentChange =
-  getUserInfo documentChange >>= processUser userSynchronizers >> return Nothing
+processWatchItem userSynchronizers documentChange = runMaybeT $ do
+  ui <- getUserInfo documentChange >>= hoistMaybe
+  processUser userSynchronizers ui
+  hoistMaybe Nothing
 
 
-getUserInfo :: (MonadIO m, MonadThrow m, MonadReader ServerEnvironmentInfo m) => DocumentChange -> m UserInfo
+getUserInfo :: (MonadIO m, MonadThrow m, MonadReader ServerEnvironmentInfo m) => DocumentChange -> m (Maybe UserInfo)
 getUserInfo documentChange = do
   let
     docId = documentChange ^. W._id
-  req <- parseRequest =<< getObjectUrl usersDatabaseName docId
-  resp <- httpJSON req
-  return $ getResponseBody resp
-
-
-getObjectUrl :: MonadReader ServerEnvironmentInfo m => Text -> Text -> m String
-getObjectUrl databaseId objectId = do
-  couchdbUrl <- view couchdbServer
-  return $ unpack $ couchdbUrl <> "/" <> databaseId <> "/" <> objectId
+  getObject usersDatabaseName docId
 
 
 processUser :: (MonadIO m, MonadReader ServerEnvironmentInfo m) => UserSynchronizers -> UserInfo -> m ()
@@ -192,22 +162,49 @@ synchronizeUserLoop userInfo = do
       liftIO $ print e
       throwM e
 
-    processItem :: (MonadThrow m, MonadIO m, MonadState (S.Set Text, S.Set Text) m) => Text -> OnedriveItem -> m ()
+    processItem :: (MonadThrow m, MonadIO m, MonadReader ServerEnvironmentInfo m, MonadState (S.Set Text, S.Set Text) m) => Text -> OnedriveItem -> m ()
     processItem _ i = do
-      (readSet, processedSet) <- get
       let
         currentId =
           i ^. id_
+
         filename =
           i ^. name
+
         parentItemId =
           i ^. parentReference . _Just . IR.id_
 
+        isFile =
+          isNothing $ i ^. folder
+
+        bookInfoId =
+          "books/" <> currentId
+
+        userDatabaseId =
+          userDatabaseName $ userInfo ^. U._id
+
+        createOrUpdateBookInfo itemId isRead = do
+          maybeBook <- getObject userDatabaseId itemId
+          let
+            newBook = case maybeBook of
+              Nothing ->
+                BookInfo bookInfoId Nothing isRead
+              Just oldBook ->
+                set read_ isRead oldBook
+          putObject userDatabaseId itemId newBook
+
+      (readSet, processedSet) <- get
       unless (S.member currentId processedSet) $ do
         unless (S.member parentItemId processedSet) $
           liftIO $ putStrLn $ "Parent itemId not found: " ++ show parentItemId
-        when (S.member parentItemId readSet) $
-          liftIO $ putStrLn $ "Read: " ++ show filename
+        when isFile $ do
+          let
+            isRead =
+              S.member parentItemId readSet
+            prefix =
+              if isRead then "Read" else "Not read"
+          createOrUpdateBookInfo bookInfoId isRead
+          liftIO $ putStrLn $ prefix ++ ": " ++ show filename
         let
           newProcessedSet =
             S.insert currentId processedSet
