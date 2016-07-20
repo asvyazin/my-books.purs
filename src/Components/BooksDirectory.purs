@@ -226,7 +226,7 @@ reactClass =
       props <- liftEff $ R.getProps this
       void $ runMaybeT $ do
         db <- hoistMaybe props.db
-        BooksDirectoryInfo info <- lift (tryGetJson db booksDirectoryInfoId) >>= hoistMaybe
+        BooksDirectoryInfo info <- lift $ getBooksDirectoryInfo db
         dir1 <- lift $ getDirectoryInfo props.onedriveToken info.booksItemId
         dir2 <- lift $ getDirectoryInfo props.onedriveToken info.readItemId
         liftEff $ R.transformState this (_ { booksDir = Just dir1, readDir = Just dir2, stateLoaded = true })
@@ -253,9 +253,14 @@ getDirectoryInfo token itemId = do
        maybe reference.path (\i -> S.drop (i + 1) reference.path) idx
 
 
+getBooksDirectoryInfo :: forall e. PouchDB -> PouchDBAff e BooksDirectoryInfo
+getBooksDirectoryInfo db =
+  fromMaybe defaultBooksDirectoryInfo <$> tryGetJson db booksDirectoryInfoId
+
+
 updateBooksDirectoryIfNeeded :: forall e. PouchDB -> Maybe String -> Maybe String -> PouchDBAff e Unit
 updateBooksDirectoryIfNeeded db booksItemId readItemId = do
-  BooksDirectoryInfo current <- fromMaybe defaultBooksDirectoryInfo <$> tryGetJson db booksDirectoryInfoId
+  BooksDirectoryInfo current <- getBooksDirectoryInfo db
   when (current.booksItemId /= booksItemId || current.readItemId /= readItemId) $
     putJson db $ BooksDirectoryInfo current { booksItemId = booksItemId
                                             , readItemId = readItemId
