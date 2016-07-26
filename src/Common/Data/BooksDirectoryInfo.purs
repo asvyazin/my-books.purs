@@ -33,7 +33,9 @@ instance decodeJsonBooksDirectoryInfo :: DecodeJson BooksDirectoryInfo where
 
 instance encodeJsonBooksDirectoryInfo :: EncodeJson BooksDirectoryInfo where
   encodeJson (BooksDirectoryInfo info) =
-    ("_id" := info._id) ~> ("booksItemId" := info.booksItemId) ~> ("readItemId" := info.readItemId) ~> jsonEmptyObject `withRev` info._rev
+    ("_id" := info._id) ~>
+    ("booksItemId" := info.booksItemId) ~>
+    ("readItemId" := info.readItemId) ~> jsonEmptyObject `withRev` info._rev
 
 
 booksDirectoryInfoId :: String
