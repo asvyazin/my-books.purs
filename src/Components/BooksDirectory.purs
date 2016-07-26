@@ -29,6 +29,7 @@ import Network.HTTP.Affjax (AJAX)
 import Prelude
 import React (ReactElement, ReactClass, createElement, createClass, transformState, getProps) as R
 import React.DOM (text, form) as R
+import React.DOM.Props (action) as RP
 import Thermite as T
 
 
@@ -198,7 +199,7 @@ wrapForm =
   where
     wrapRender origRender dispatch p s c =
       [ R.form
-        [ ]
+        [ RP.action "#" ]
         (origRender dispatch p s c)
       ]
 
