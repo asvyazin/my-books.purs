@@ -4,6 +4,7 @@
 module BookIndexer.CouchDB.Changes.Watcher where
 
 
+import BookIndexer.Types.Seq (Seq(IntSeq, TextSeq, EmptySeq))
 import Common.JSONHelper (jsonParser)
 import Control.Applicative ((<|>))
 import Control.Lens (makeLenses)
@@ -16,7 +17,6 @@ import Data.ByteString.Char8 (pack, unpack)
 import Data.Conduit ((=$=), Sink, fuseBoth, await, yield)
 import Data.Conduit.Attoparsec (conduitParser)
 import qualified Data.Conduit.Combinators as DC (map)
-import Data.Int (Int64)
 import Data.Maybe (catMaybes, fromMaybe)
 import Data.Monoid ((<>))
 import Data.Text (Text)
@@ -35,11 +35,16 @@ watchChanges params consumer = do
       watchChanges params { _since = Just ls } consumer
 
 
-watchChanges' :: (MonadIO m, MonadMask m) => WatchParams -> Sink DocumentChange m a -> m (Maybe Int64, a)
+watchChanges' :: (MonadIO m, MonadMask m) => WatchParams -> Sink DocumentChange m a -> m (Maybe Seq, a)
 watchChanges' params consumer = do
   let
-    sinceParam i64 =
-      ("since", Just $ pack $ show i64)
+    sinceParam s =
+      ("since", Just $ seqToString s)
+
+    seqToString EmptySeq = ""
+    seqToString (IntSeq i64) =
+      pack $ show i64
+    seqToString (TextSeq str) = encodeUtf8 str
 
     filterParam flt =
       ("filter", Just $ encodeUtf8 flt)
@@ -73,7 +78,7 @@ data WatchParams =
   WatchParams
   { _baseUrl :: Text
   , _database :: Text
-  , _since :: Maybe Int64
+  , _since :: Maybe Seq
   , _filter :: Maybe Text
   }
 
@@ -86,38 +91,36 @@ data WatchItem
 
 data DocumentChange =
   DocumentChange
-  { __seq :: Int64
+  { __seq :: Seq
   , __id :: Text
   , _changes :: [Change]
+  , _deleted :: Bool
   } deriving (Show)
 
 
 data Change =
   Change
   { _rev :: Text
-  , _deleted :: Bool
   } deriving (Show)
 
 
 instance FromJSON DocumentChange where
   parseJSON (Object v) =
-    DocumentChange <$> (v .: "seq") <*> (v .: "id") <*> (v .: "changes")
+    DocumentChange <$> v .: "seq" <*> v .: "id" <*> v .: "changes" <*> (fromMaybe False <$> v .:? "deleted")
   parseJSON _ =
     error "Invalid DocumentChange JSON"
 
 
 instance FromJSON Change where
-  parseJSON (Object v) = do
-    rev <- v .: "rev"
-    deleted <- fromMaybe False <$> v .:? "deleted"
-    return $ Change rev deleted
+  parseJSON (Object v) =
+    Change <$> v .: "rev"
   parseJSON _ =
     error "Invalid Change JSON"
 
 
 data LastSeq =
   LastSeq
-  { _lastSeq :: Int64
+  { _lastSeq :: Seq
   } deriving (Show)
 
 

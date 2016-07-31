@@ -8,9 +8,11 @@ import qualified BookIndexer.CouchDB.Changes.Watcher as W (_id)
 import BookIndexer.CouchDB.Requests (getObject, putObject)
 import BookIndexer.IndexerState (IndexerState(IndexerState), lastSeq, indexerStateId)
 import BookIndexer.Types.BookInfo (BookInfo(BookInfo), read_)
+import qualified BookIndexer.Types.BookInfo as BI (token)
+import BookIndexer.Types.Seq (Seq)
 -- import Codec.Epub (getPkgPathXmlFromBS, getMetadata)
 -- import Codec.Epub.Data.Metadata (Metadata(..), Creator(..), Title(..))
-import Common.BooksDirectoryInfo (getBooksDirectoryInfo, booksItemId, readItemId)
+import Common.BooksDirectoryInfo (BooksDirectoryInfo, getBooksDirectoryInfo, booksItemId, readItemId)
 import Common.Database (usersDatabaseName, indexerDatabaseName, userDatabaseName, usersFilter)
 import qualified Common.Onedrive as OD (getOnedriveClientSecret)
 import Common.OnedriveInfo (getOnedriveInfo, token, refreshToken)
@@ -36,8 +38,7 @@ import Control.Monad.Trans.Maybe (runMaybeT)
 -- import qualified Data.ByteString.Lazy as BL (toStrict)
 import Data.Conduit (($$), (=$=))
 import qualified Data.Conduit.Combinators as DC (last, mapM_, concatMapM)
-import Data.Int (Int64)
-import Data.Maybe (fromJust, isNothing)
+import Data.Maybe (fromJust, isNothing, maybe)
 import Data.Monoid ((<>))
 import qualified Data.Set as S (Set, member, insert, singleton)
 import Data.Text (Text, {-, takeEnd, intercalate, pack-})
@@ -73,12 +74,14 @@ main = do
           putObject indexerDatabaseName indexerStateId $ newIndexerState state newLastSeq
 
 
-newIndexerState :: Maybe IndexerState -> Int64 -> IndexerState
+newIndexerState :: Maybe IndexerState -> Seq -> IndexerState
 newIndexerState current ls =
   maybe (IndexerState Nothing ls) (set lastSeq ls) current
 
 
-watchNewUsersLoop :: (MonadReader ServerEnvironmentInfo m, MonadMask  m, MonadIO m) => UserSynchronizers -> Maybe Int64 -> m (Maybe Int64)
+watchNewUsersLoop :: (MonadReader ServerEnvironmentInfo m
+                     , MonadMask  m
+                     , MonadIO m) => UserSynchronizers -> Maybe Seq -> m (Maybe Seq)
 watchNewUsersLoop userSynchronizers ls = do
   couchdbUrl <- view couchdbServer
   let
@@ -92,7 +95,9 @@ watchNewUsersLoop userSynchronizers ls = do
   watchChanges watchParams (DC.concatMapM (processWatchItem userSynchronizers) =$= DC.last) -- TODO: catch exceptions
 
 
-processWatchItem :: (MonadIO m, MonadReader ServerEnvironmentInfo m, MonadThrow m) => UserSynchronizers -> DocumentChange -> m (Maybe Int64)
+processWatchItem :: (MonadIO m
+                    , MonadReader ServerEnvironmentInfo m
+                    , MonadThrow m) => UserSynchronizers -> DocumentChange -> m (Maybe Seq)
 processWatchItem userSynchronizers documentChange = runMaybeT $ do
   ui <- getUserInfo documentChange >>= hoistMaybe
   processUser userSynchronizers ui
@@ -135,7 +140,7 @@ synchronizeUserLoop userInfo = do
   onedriveReader <- newFolderChangesReader session booksFolder Nothing
   let
     loop =
-      enumerateChanges onedriveReader $$ DC.mapM_ (processItem tok)
+      enumerateChanges onedriveReader $$ DC.mapM_ (processItem booksDirectoryInfo)
     startState =
       (S.singleton readFolder, S.singleton booksFolder)
   void (runStateT loop startState) `catch` logError
@@ -162,8 +167,11 @@ synchronizeUserLoop userInfo = do
       liftIO $ print e
       throwM e
 
-    processItem :: (MonadThrow m, MonadIO m, MonadReader ServerEnvironmentInfo m, MonadState (S.Set Text, S.Set Text) m) => Text -> OnedriveItem -> m ()
-    processItem _ i = do
+    processItem :: (MonadThrow m
+                   , MonadIO m
+                   , MonadReader ServerEnvironmentInfo m
+                   , MonadState (S.Set Text, S.Set Text) m) => BooksDirectoryInfo -> OnedriveItem -> m ()
+    processItem booksDirectoryInfo i = do
       let
         currentId =
           i ^. id_
@@ -177,6 +185,15 @@ synchronizeUserLoop userInfo = do
         isFile =
           isNothing $ i ^. folder
 
+        booksFolder =
+          booksDirectoryInfo ^. booksItemId
+
+        readFolder =
+          booksDirectoryInfo ^. readItemId
+
+        bookInfoToken =
+          booksFolder <> ":" <> readFolder
+
         bookInfoId =
           "books/" <> currentId
 
@@ -184,13 +201,12 @@ synchronizeUserLoop userInfo = do
           userDatabaseName $ userInfo ^. U._id
 
         createOrUpdateBookInfo itemId isRead = do
-          maybeBook <- getObject userDatabaseId itemId
           let
-            newBook = case maybeBook of
-              Nothing ->
-                BookInfo bookInfoId Nothing isRead
-              Just oldBook ->
-                set read_ isRead oldBook
+            defaultBook =
+              BookInfo bookInfoId Nothing isRead bookInfoToken
+            updateBook =
+              set BI.token bookInfoToken . set read_ isRead
+          newBook <- maybe defaultBook updateBook <$> getObject userDatabaseId itemId
           putObject userDatabaseId itemId newBook
 
       (readSet, processedSet) <- get

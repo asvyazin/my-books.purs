@@ -57,6 +57,7 @@ executable BookIndexer
                                 BookIndexer.CouchDB.Requests,
                                 BookIndexer.IndexerState,
                                 BookIndexer.Types.BookInfo,
+                                BookIndexer.Types.Seq,
                                 Common.BooksDirectoryInfo,
                                 Common.Database,
                                 Common.HTTPHelper,
