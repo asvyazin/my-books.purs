@@ -5,7 +5,7 @@ module Main (main) where
 
 import Common.Database (userDatabaseName)
 import Common.Onedrive (getOnedriveClientSecret)
-import Common.OnedriveInfo (getOnedriveInfo, setOnedriveInfo, token, refreshToken)
+import Common.OnedriveInfo (onedriveInfoId, defaultOnedriveInfo, token, refreshToken)
 import Common.ServerEnvironmentInfo (ServerEnvironmentInfo(..), getServerEnvironment)
 import Control.Concurrent (forkIO)
 import Control.Lens ((^.), set)
@@ -13,7 +13,8 @@ import Control.Monad (when, void)
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (lift)
-import Data.Maybe (fromJust)
+import CouchDB.Requests (getObject, putObject)
+import Data.Maybe (fromJust, fromMaybe)
 import Data.Monoid ((<>))
 import qualified Data.Text as T (Text, concat)
 import qualified Data.Text.Encoding as T (decodeUtf8)
@@ -143,8 +144,8 @@ updateOnedriveInfoIfNeeded couchdbUrl userId tokenResp = do
     databaseId = userDatabaseName userId
     newToken = tokenResp ^. Resp.accessToken
     newRefreshToken = tokenResp ^. Resp.refreshToken
-  currentInfo <- getOnedriveInfo couchdbUrl databaseId
+  currentInfo <- fromMaybe defaultOnedriveInfo <$> getObject couchdbUrl databaseId onedriveInfoId
   when ((currentInfo ^. token) /= newToken || (currentInfo ^. Common.OnedriveInfo.refreshToken) /= newRefreshToken) $ do
     let
       newInfo = set Common.OnedriveInfo.refreshToken newRefreshToken $ set token newToken currentInfo
-    setOnedriveInfo couchdbUrl databaseId newInfo
+    putObject couchdbUrl databaseId onedriveInfoId newInfo

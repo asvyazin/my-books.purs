@@ -3,19 +3,19 @@
 module Main (main) where
 
 
-import BookIndexer.CouchDB.Changes.Watcher (watchChanges, WatchParams(..), DocumentChange)
-import qualified BookIndexer.CouchDB.Changes.Watcher as W (_id)
-import BookIndexer.CouchDB.Requests (getObject, putObject)
+import CouchDB.Changes.Watcher (watchChanges, WatchParams(..), DocumentChange)
+import qualified CouchDB.Changes.Watcher as W (_id)
+import CouchDB.Requests (getObject, putObject)
 import BookIndexer.IndexerState (IndexerState(IndexerState), lastSeq, indexerStateId)
 import BookIndexer.Types.BookInfo (BookInfo(BookInfo), read_)
 import qualified BookIndexer.Types.BookInfo as BI (token)
-import BookIndexer.Types.Seq (Seq)
+import CouchDB.Types.Seq (Seq)
 -- import Codec.Epub (getPkgPathXmlFromBS, getMetadata)
 -- import Codec.Epub.Data.Metadata (Metadata(..), Creator(..), Title(..))
 import Common.BooksDirectoryInfo (BooksDirectoryInfo, getBooksDirectoryInfo, booksItemId, readItemId)
 import Common.Database (usersDatabaseName, indexerDatabaseName, userDatabaseName, usersFilter)
 import qualified Common.Onedrive as OD (getOnedriveClientSecret)
-import Common.OnedriveInfo (getOnedriveInfo, token, refreshToken)
+import Common.OnedriveInfo (onedriveInfoId, defaultOnedriveInfo, token, refreshToken)
 import Common.ServerEnvironmentInfo (getServerEnvironment, couchdbServer, onedriveClientId, appBaseUrl, ServerEnvironmentInfo)
 import Common.UserInfo (UserInfo)
 import qualified Common.UserInfo as U (_id)
@@ -38,7 +38,7 @@ import Control.Monad.Trans.Maybe (runMaybeT)
 -- import qualified Data.ByteString.Lazy as BL (toStrict)
 import Data.Conduit (($$), (=$=))
 import qualified Data.Conduit.Combinators as DC (last, mapM_, concatMapM)
-import Data.Maybe (fromJust, isNothing, maybe)
+import Data.Maybe (fromJust, isNothing, maybe, fromMaybe)
 import Data.Monoid ((<>))
 import qualified Data.Set as S (Set, member, insert, singleton)
 import Data.Text (Text, {-, takeEnd, intercalate, pack-})
@@ -59,19 +59,17 @@ type UserSynchronizers =
 main :: IO ()
 main = do
   serverEnv <- getServerEnvironment
+  let couchdb = serverEnv ^. couchdbServer
   userSynchronizers <- atomically $ newTVar []
-  runReaderT (runMain userSynchronizers) serverEnv
-  where
-    runMain userSynchronizers = do
-      state <- getObject indexerDatabaseName indexerStateId
-      let
-        ls = view lastSeq <$> state
-      maybeNewLastSeq <- watchNewUsersLoop userSynchronizers ls
-      case maybeNewLastSeq of
-        Nothing ->
-          return ()
-        Just newLastSeq ->
-          putObject indexerDatabaseName indexerStateId $ newIndexerState state newLastSeq
+  state <- getObject couchdb indexerDatabaseName indexerStateId
+  let
+    ls = view lastSeq <$> state
+  maybeNewLastSeq <- runReaderT (watchNewUsersLoop userSynchronizers ls) serverEnv
+  case maybeNewLastSeq of
+    Nothing ->
+      return ()
+    Just newLastSeq ->
+      putObject couchdb indexerDatabaseName indexerStateId $ newIndexerState state newLastSeq
 
 
 newIndexerState :: Maybe IndexerState -> Seq -> IndexerState
@@ -79,15 +77,15 @@ newIndexerState current ls =
   maybe (IndexerState Nothing ls) (set lastSeq ls) current
 
 
-watchNewUsersLoop :: (MonadReader ServerEnvironmentInfo m
-                     , MonadMask  m
+watchNewUsersLoop :: (MonadMask  m
+                     , MonadReader ServerEnvironmentInfo m
                      , MonadIO m) => UserSynchronizers -> Maybe Seq -> m (Maybe Seq)
 watchNewUsersLoop userSynchronizers ls = do
-  couchdbUrl <- view couchdbServer
+  env <- ask
   let
     watchParams =
       WatchParams
-      { _baseUrl = couchdbUrl
+      { _baseUrl = env ^. couchdbServer
       , _database = usersDatabaseName
       , _since = ls
       , _filter = Just usersFilter
@@ -106,9 +104,11 @@ processWatchItem userSynchronizers documentChange = runMaybeT $ do
 
 getUserInfo :: (MonadIO m, MonadThrow m, MonadReader ServerEnvironmentInfo m) => DocumentChange -> m (Maybe UserInfo)
 getUserInfo documentChange = do
+  env <- ask
   let
+    couchdb = env ^. couchdbServer
     docId = documentChange ^. W._id
-  getObject usersDatabaseName docId
+  getObject couchdb usersDatabaseName docId
 
 
 processUser :: (MonadIO m, MonadReader ServerEnvironmentInfo m) => UserSynchronizers -> UserInfo -> m ()
@@ -121,12 +121,14 @@ processUser userSynchronizers userInfo = do
 
 synchronizeUserLoop :: (MonadCatch m, MonadIO m, MonadReader ServerEnvironmentInfo m) => UserInfo -> m ()
 synchronizeUserLoop userInfo = do
-  couchdbUrl <- view couchdbServer
+  serverEnv <- ask
   let
+    couchdb =
+      serverEnv ^. couchdbServer
     userDatabaseId =
       userDatabaseName $ userInfo ^. U._id
-  onedriveInfo <- getOnedriveInfo couchdbUrl userDatabaseId
-  booksDirectoryInfo <- getBooksDirectoryInfo couchdbUrl userDatabaseId
+  onedriveInfo <- fromMaybe defaultOnedriveInfo <$> getObject couchdb userDatabaseId onedriveInfoId
+  booksDirectoryInfo <- getBooksDirectoryInfo couchdb userDatabaseId
   let
     tok =
       onedriveInfo ^. token
@@ -135,12 +137,11 @@ synchronizeUserLoop userInfo = do
     readFolder =
       booksDirectoryInfo ^. readItemId
   liftIO $ putStrLn $ "Books itemId: " ++ show booksFolder
-  serverEnv <- ask
   session <- liftIO $ newSessionWithRenewableToken tok (runReaderT renewToken serverEnv)
   onedriveReader <- newFolderChangesReader session booksFolder Nothing
   let
     loop =
-      enumerateChanges onedriveReader $$ DC.mapM_ (processItem booksDirectoryInfo)
+      enumerateChanges onedriveReader $$ DC.mapM_ (processItem couchdb booksDirectoryInfo)
     startState =
       (S.singleton readFolder, S.singleton booksFolder)
   void (runStateT loop startState) `catch` logError
@@ -153,7 +154,7 @@ synchronizeUserLoop userInfo = do
           env ^. couchdbServer
         userDatabaseId =
           userDatabaseName $ userInfo ^. U._id
-      onedriveInfo <- getOnedriveInfo couchdbUrl userDatabaseId
+      onedriveInfo <- fromMaybe defaultOnedriveInfo <$> getObject couchdbUrl userDatabaseId onedriveInfoId
       let
         tok =
           fromJust (onedriveInfo ^. refreshToken)
@@ -169,9 +170,8 @@ synchronizeUserLoop userInfo = do
 
     processItem :: (MonadThrow m
                    , MonadIO m
-                   , MonadReader ServerEnvironmentInfo m
-                   , MonadState (S.Set Text, S.Set Text) m) => BooksDirectoryInfo -> OnedriveItem -> m ()
-    processItem booksDirectoryInfo i = do
+                   , MonadState (S.Set Text, S.Set Text) m) => Text -> BooksDirectoryInfo -> OnedriveItem -> m ()
+    processItem couchdb booksDirectoryInfo i = do
       let
         currentId =
           i ^. id_
@@ -206,8 +206,8 @@ synchronizeUserLoop userInfo = do
               BookInfo bookInfoId Nothing isRead bookInfoToken
             updateBook =
               set BI.token bookInfoToken . set read_ isRead
-          newBook <- maybe defaultBook updateBook <$> getObject userDatabaseId itemId
-          putObject userDatabaseId itemId newBook
+          newBook <- maybe defaultBook updateBook <$> getObject couchdb userDatabaseId itemId
+          putObject couchdb userDatabaseId itemId newBook
 
       (readSet, processedSet) <- get
       unless (S.member currentId processedSet) $ do

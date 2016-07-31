@@ -7,3 +7,6 @@
 [submodule "hs-onedrive"]
 	path = server/hs-onedrive
 	url = https://github.com/asvyazin/hs-onedrive.git
+[submodule "hs-couchdb"]
+	path = server/hs-couchdb
+	url = https://github.com/asvyazin/hs-couchdb.git

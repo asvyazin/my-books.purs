@@ -6,7 +6,7 @@
 module BookIndexer.IndexerState where
 
 
-import BookIndexer.Types.Seq (Seq)
+import CouchDB.Types.Seq (Seq)
 import Control.Lens ((^.), makeLensesWith, camelCaseFields)
 import Data.Aeson (FromJSON(parseJSON), ToJSON(toJSON), (.:), (.=), object, Value(Object))
 import Data.Maybe (catMaybes)
