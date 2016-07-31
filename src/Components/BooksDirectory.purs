@@ -8,9 +8,12 @@ import Components.AjaxLoader.AjaxLoader as AjaxLoader
 import Components.ChooseDirectoryModal as ChooseDirectoryModal
 import Components.OneDriveFileTree as FileTree
 import Components.Wrappers.Button as Button
+import Components.Wrappers.Col as Col
 import Components.Wrappers.ControlLabel as ControlLabel
+import Components.Wrappers.Form as Form
 import Components.Wrappers.FormControl as FormControl
 import Components.Wrappers.FormGroup as FormGroup
+import Components.Wrappers.Panel as Panel
 import Control.Coroutine (cotransform)
 import Control.Monad.Aff (Aff, launchAff)
 import Control.Monad.Eff.Class (liftEff)
@@ -28,8 +31,7 @@ import Libs.PouchDB.Json (tryGetJson, putJson)
 import Network.HTTP.Affjax (AJAX)
 import Prelude
 import React (ReactElement, ReactClass, createElement, createClass, transformState, getProps) as R
-import React.DOM (text, form) as R
-import React.DOM.Props (action) as RP
+import React.DOM (text, h3) as R
 import Thermite as T
 
 
@@ -124,35 +126,40 @@ spec =
                     then
                       AjaxLoader.spec
                     else
-                      wrapForm $ booksDirectoryGroup <> readDirectoryGroup <> saveButton
+                      wrapPanel (R.h3 [] [ R.text "Settings" ]) $ wrapForm $ booksDirectoryGroup <> readDirectoryGroup <> saveButton
   , T.simpleSpec performAction T.defaultRender
   , mapProps tryGetChooseDirectoryModalProps $ maybeProps $ T.focus booksModal booksModalAction ChooseDirectoryModal.spec
   , mapProps tryGetChooseDirectoryModalProps $ maybeProps $ T.focus readModal readModalAction ChooseDirectoryModal.spec
   ]
   where
     booksDirectoryGroup =
-      wrapFormGroup (Just "booksDirectory") $ T.simpleSpec T.defaultPerformAction render
-      where
-        render dispatch _ s _ =
-          [ ControlLabel.controlLabel {} [ R.text "Books directory" ]
-          , renderDirectoryInfo "Books directory placeholder" s.booksDir
-          , Button.button { bsStyle: "link", onClick: dispatch (BooksModalAction ChooseDirectoryModal.ShowModal) } [ R.text "Choose directory" ]
-          ]
+      directoryGroup "booksDirectory" "Books directory" "Books directory placeholder" _.booksDir BooksModalAction
 
     readDirectoryGroup =
-      wrapFormGroup (Just "readDirectory") $ T.simpleSpec T.defaultPerformAction render
+      directoryGroup "readDirectory" "Read directory" "Read directory placeholder" _.readDir ReadModalAction
+
+    directoryGroup controlId labelText placeholderText dirAccessor actionConstructor =
+      wrapFormGroup (Just controlId) $ T.simpleSpec T.defaultPerformAction render
       where
         render dispatch _ s _ =
-          [ ControlLabel.controlLabel {} [ R.text "Read directory" ]
-          , renderDirectoryInfo "Read directory placeholder" s.readDir
-          , Button.button { bsStyle: "link", onClick: dispatch (ReadModalAction ChooseDirectoryModal.ShowModal) } [ R.text "Choose directory" ]
+          [ Col.col { sm: 2, componentClass: ControlLabel.controlLabelFFI } [ R.text labelText ]
+          , Col.col { sm: 2 } [ renderDirectoryInfo placeholderText (dirAccessor s) ]
+          , Col.col { sm: 8 } [ Button.button
+                                { bsStyle: "link"
+                                , onClick: dispatch (actionConstructor ChooseDirectoryModal.ShowModal)
+                                }
+                                [ R.text "Choose directory" ]
+                              ]
           ]
 
     saveButton =
       T.simpleSpec T.defaultPerformAction render
       where
         render dispatch _ _ _ =
-          [ Button.button { type: "submit", onClick: dispatch Save } [ R.text "Save" ] ]
+          [ Col.col
+            { smOffset: 2, sm: 10 }
+            [ Button.button { type: "submit", onClick: dispatch Save } [ R.text "Save" ] ]
+          ]
 
     performAction Save props state =
       void $ runMaybeT $ do
@@ -193,13 +200,24 @@ spec =
       FormControl.formControlStatic {} [ R.text (maybe placeholder _.path maybeDirInfo) ]
 
 
+wrapPanel :: forall eff state props action. R.ReactElement -> T.Spec eff state props action -> T.Spec eff state props action
+wrapPanel header =
+  over T._render wrapRender
+  where
+    wrapRender origRender dispatch p s c =
+      [ Panel.panel
+        { header: header }
+        (origRender dispatch p s c)
+      ]
+
+
 wrapForm :: forall eff state props action. T.Spec eff state props action -> T.Spec eff state props action
 wrapForm =
   over T._render wrapRender
   where
     wrapRender origRender dispatch p s c =
-      [ R.form
-        [ RP.action "#" ]
+      [ Form.form
+        { horizontal: true, action: "#" }
         (origRender dispatch p s c)
       ]
 

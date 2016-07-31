@@ -27,7 +27,6 @@ import Network.HTTP.Affjax (AJAX)
 import Prelude
 import React (ReactClass, transformState, createClass) as R
 import React.DOM (div) as R
-import React.DOM.Props as RP
 import Thermite as T
 import Web.Cookies (getCookie)
 
@@ -62,7 +61,7 @@ spec =
 
     renderBooksDirectory _ _ (Just state) _ =
       [ R.div
-        [ RP.className "center-block text-center" ]
+        [ ]
         [ BooksDirectory.booksDirectory $ convertToBooksDirectoryProps state ]
       ]
     renderBooksDirectory _ _ _ _ = []
