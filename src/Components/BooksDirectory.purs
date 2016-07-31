@@ -142,9 +142,9 @@ spec =
       wrapFormGroup (Just controlId) $ T.simpleSpec T.defaultPerformAction render
       where
         render dispatch _ s _ =
-          [ Col.col { sm: 2, componentClass: ControlLabel.controlLabelFFI } [ R.text labelText ]
-          , Col.col { sm: 2 } [ renderDirectoryInfo placeholderText (dirAccessor s) ]
-          , Col.col { sm: 8 } [ Button.button
+          [ Col.col { lg: 2, componentClass: ControlLabel.controlLabelFFI } [ R.text labelText ]
+          , Col.col { lg: 2 } [ renderDirectoryInfo placeholderText (dirAccessor s) ]
+          , Col.col { lg: 8 } [ Button.button
                                 { bsStyle: "link"
                                 , onClick: dispatch (actionConstructor ChooseDirectoryModal.ShowModal)
                                 }
@@ -157,7 +157,7 @@ spec =
       where
         render dispatch _ _ _ =
           [ Col.col
-            { smOffset: 2, sm: 10 }
+            { lgOffset: 2, lg: 10 }
             [ Button.button { type: "submit", onClick: dispatch Save } [ R.text "Save" ] ]
           ]
 

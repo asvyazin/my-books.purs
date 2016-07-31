@@ -2,10 +2,16 @@ module Common.React where
 
 
 import Control.Coroutine (transformCoTransformL, transformCoTransformR, transform)
+import Control.Monad.Maybe.Trans (runMaybeT)
 import Control.Monad.Rec.Class (forever)
+import Control.Monad.Trans (lift)
+import Control.Error.Util (hoistMaybe)
 import Data.Lens (view)
+import Data.List (List(..), (!!))
 import Data.Maybe (Maybe(..))
+import Data.Tuple (Tuple(..))
 import Prelude
+import React as R
 import Thermite as T
 
 
@@ -78,3 +84,30 @@ maybeProps origSpec =
           []
         Just p' ->
           view T._render origSpec d p' s c
+
+
+wrapperSpec :: forall eff state props action. (props -> Array R.ReactElement -> R.ReactElement) -> T.Spec eff state props action
+wrapperSpec elementCreator =
+  T.simpleSpec T.defaultPerformAction render
+  where
+    render _ p _ c =
+      [ elementCreator p c ]
+
+      
+foreachProps :: forall eff state props action. T.Spec eff state props action -> T.Spec eff state (List props) (Tuple Int action)
+foreachProps origSpec =
+  T.simpleSpec performAction render
+  where
+    performAction (Tuple idx action) propsArr state =
+      void $ runMaybeT $ do
+        childProps <- hoistMaybe $ propsArr !! idx
+        lift $ view T._performAction origSpec action childProps state
+
+    render dispatch propsArr state _ =
+      foldWithIndex (\ idx props els -> els <> view T._render origSpec (dispatch <<< Tuple idx) props state []) propsArr []
+
+foldWithIndex :: forall a r. (Int -> a -> r -> r) -> List a -> r -> r
+foldWithIndex f = go 0
+  where
+    go _ Nil         r = r
+    go i (Cons x xs) r = go (i + 1) xs (f i x r)

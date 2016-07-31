@@ -7,6 +7,7 @@ import Common.OneDriveApi (getUserInfo, UserInfo(UserInfo))
 import Common.React (mapProps)
 import Components.AjaxLoader.AjaxLoader as AjaxLoader
 import Components.BooksDirectory as BooksDirectory
+import Components.BookThumbnails as BookThumbnails
 import Components.Header as Header
 import Control.Monad.Aff (launchAff, Aff)
 import Control.Monad.Eff (Eff)
@@ -51,6 +52,7 @@ spec =
                     Just s ->
                       fold [ mapProps (convertToHeaderProps s) Header.spec
                            , T.simpleSpec T.defaultPerformAction renderBooksDirectory
+                           , T.simpleSpec T.defaultPerformAction renderThumbnails
                            ]
   where
     convertToHeaderProps s _ =
@@ -65,6 +67,11 @@ spec =
         [ BooksDirectory.booksDirectory $ convertToBooksDirectoryProps state ]
       ]
     renderBooksDirectory _ _ _ _ = []
+
+    renderThumbnails _ _ (Just _) _ =
+      [ BookThumbnails.bookThumbnails ]
+    renderThumbnails _ _ _ _ =
+      []
 
     convertToBooksDirectoryProps s =
       { onedriveToken: s.onedriveToken
