@@ -2,7 +2,6 @@
 module Common.Database where
 
 
-import Common.HTTPHelper (textUrlEncode)
 import Data.Monoid ((<>))
 import Data.Text (Text)
 
@@ -14,7 +13,7 @@ usersDatabaseName =
 
 userDatabaseName :: Text -> Text
 userDatabaseName userId =
-  textUrlEncode False $ usersDatabaseName <> "/" <> userId
+  usersDatabaseName <> "/" <> userId
 
 
 indexerDatabaseName :: Text

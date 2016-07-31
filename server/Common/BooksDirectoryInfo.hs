@@ -8,12 +8,8 @@ module Common.BooksDirectoryInfo where
 
 
 import Control.Lens (makeLensesWith, camelCaseFields)
-import Control.Monad.Catch (MonadThrow)
-import Control.Monad.IO.Class (MonadIO)
 import Data.Aeson (FromJSON(parseJSON), Value(Object), (.:), (.:?))
-import Data.Monoid ((<>))
-import Data.Text (Text, unpack)
-import Network.HTTP.Simple (parseRequest, httpJSON, getResponseBody)
+import Data.Text (Text)
 
 
 data BooksDirectoryInfo =
@@ -39,12 +35,11 @@ instance FromJSON BooksDirectoryInfo where
     error "Invalid BooksDirectoryInfo JSON"
 
 
-getBooksDirectoryInfo :: (MonadThrow m, MonadIO m) => Text -> Text -> m BooksDirectoryInfo
-getBooksDirectoryInfo couchdbUrl databaseId = do
-  req <- parseRequest $ unpack $ couchdbUrl <> "/" <> databaseId <> "/" <> booksDirectoryInfoId
-  getResponseBody <$> httpJSON req
-
-
 booksDirectoryInfoId :: Text
 booksDirectoryInfoId =
   "booksDirectoryInfo"
+
+
+defaultBooksDirectoryInfo :: BooksDirectoryInfo
+defaultBooksDirectoryInfo =
+  BooksDirectoryInfo booksDirectoryInfoId Nothing "" ""

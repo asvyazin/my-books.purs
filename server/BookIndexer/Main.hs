@@ -12,7 +12,7 @@ import qualified BookIndexer.Types.BookInfo as BI (token)
 import CouchDB.Types.Seq (Seq)
 -- import Codec.Epub (getPkgPathXmlFromBS, getMetadata)
 -- import Codec.Epub.Data.Metadata (Metadata(..), Creator(..), Title(..))
-import Common.BooksDirectoryInfo (BooksDirectoryInfo, getBooksDirectoryInfo, booksItemId, readItemId)
+import Common.BooksDirectoryInfo (BooksDirectoryInfo, booksDirectoryInfoId, booksItemId, readItemId, defaultBooksDirectoryInfo)
 import Common.Database (usersDatabaseName, indexerDatabaseName, userDatabaseName, usersFilter)
 import qualified Common.Onedrive as OD (getOnedriveClientSecret)
 import Common.OnedriveInfo (onedriveInfoId, defaultOnedriveInfo, token, refreshToken)
@@ -128,7 +128,7 @@ synchronizeUserLoop userInfo = do
     userDatabaseId =
       userDatabaseName $ userInfo ^. U._id
   onedriveInfo <- fromMaybe defaultOnedriveInfo <$> getObject couchdb userDatabaseId onedriveInfoId
-  booksDirectoryInfo <- getBooksDirectoryInfo couchdb userDatabaseId
+  booksDirectoryInfo <- fromMaybe defaultBooksDirectoryInfo <$> getObject couchdb userDatabaseId booksDirectoryInfoId
   let
     tok =
       onedriveInfo ^. token
