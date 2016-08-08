@@ -1,82 +1,38 @@
 module Components.BookThumbnails where
 
 
-import Common.React (foreachProps, mapProps)
+import Common.Data.BookInfo (BookInfo(BookInfo))
+import Common.React (foreachProps, mapPropsWithState)
 import Components.BookThumbnails.Thumbnail as Thumbnail
 import Components.Wrappers.Col as Col
 import Components.Wrappers.Grid as Grid
 import Components.Wrappers.Row as Row
+import Control.Monad.Aff (launchAff)
+import Control.Monad.Eff.Class (liftEff)
 import Data.Lens (over)
 import Data.List (List, fromFoldable)
 import Data.Tuple (Tuple)
+import Libs.PouchDB (PouchDB)
+import Libs.PouchDB.Json (query)
+import Libs.PouchDB.QueryItem (getDoc)
 import Prelude
 import React as R
 import Thermite as T
 
 
-spec :: forall eff state props. T.Spec eff state props (Tuple Int Thumbnail.Action)
+type Props =
+  { db :: PouchDB
+  }
+
+
+type State =
+  { thumbnails :: List Thumbnail.Props
+  }
+
+
+spec :: forall eff. T.Spec eff State Props (Tuple Int Thumbnail.Action)
 spec =
-  let
-    thumbnails =
-      [ { imageUrl: "https://steamcdn-a.akamaihd.net/steam/apps/379720/header_292x136.jpg"
-        , size: "292x136"
-        , title: "Title"
-        , author: "Author"
-        , isRead: false
-        , id: "1"
-        },
-        { imageUrl: "https://steamcdn-a.akamaihd.net/steam/apps/379720/header_292x136.jpg"
-        , size: "292x136"
-        , title: "Title"
-        , author: "Author"
-        , isRead: false
-        , id: "2"
-        },
-        { imageUrl: "https://steamcdn-a.akamaihd.net/steam/apps/379720/header_292x136.jpg"
-        , size: "292x136"
-        , title: "Title"
-        , author: "Author"
-        , isRead: false
-        , id: "3"
-        },
-        { imageUrl: "https://steamcdn-a.akamaihd.net/steam/apps/379720/header_292x136.jpg"
-        , size: "292x136"
-        , title: "Title"
-        , author: "Author"
-        , isRead: false
-        , id: "4"
-        },
-        { imageUrl: "https://steamcdn-a.akamaihd.net/steam/apps/379720/header_292x136.jpg"
-        , size: "292x136"
-        , title: "Title"
-        , author: "Author"
-        , isRead: false
-        , id: "5"
-        },
-        { imageUrl: "https://steamcdn-a.akamaihd.net/steam/apps/379720/header_292x136.jpg"
-        , size: "292x136"
-        , title: "Title"
-        , author: "Author"
-        , isRead: false
-        , id: "6"
-        },
-        { imageUrl: "https://steamcdn-a.akamaihd.net/steam/apps/379720/header_292x136.jpg"
-        , size: "292x136"
-        , title: "Title"
-        , author: "Author"
-        , isRead: false
-        , id: "7"
-        },
-        { imageUrl: "https://steamcdn-a.akamaihd.net/steam/apps/379720/header_292x136.jpg"
-        , size: "292x136"
-        , title: "Title"
-        , author: "Author"
-        , isRead: false
-        , id: "8"
-        }
-      ]
-  in
-    mapProps (const $ fromFoldable thumbnails) thumbnailsPage
+  mapPropsWithState (\_ st -> st.thumbnails) thumbnailsPage
 
 
 thumbnailsPage :: forall eff state. T.Spec eff state (List Thumbnail.Props) (Tuple Int Thumbnail.Action)
@@ -102,6 +58,37 @@ thumbnailsPage =
           ]
 
 
-bookThumbnails :: R.ReactElement
-bookThumbnails =
-  R.createElement (T.createClass spec {}) {} []
+component :: R.ReactClass Props
+component =
+  R.createClass reactSpec.spec { componentDidMount = componentDidMount }
+  where
+    reactSpec =
+      T.createReactSpec spec defaultState
+
+    componentDidMount this = do
+      props <- R.getProps this
+      void $ launchAff $ do
+        res <- query props.db "books/all" { limit: 24, include_docs: true }
+        liftEff $ R.transformState this $ \state ->
+          state { thumbnails = map (getThumbnail <<< getDoc) res.rows }
+
+    getThumbnail :: BookInfo -> Thumbnail.Props
+    getThumbnail (BookInfo t) =
+      { imageUrl: "https://steamcdn-a.akamaihd.net/steam/apps/379720/header_292x136.jpg"
+      , size: "292x136"
+      , title: "Title"
+      , author: "Author"
+      , isRead: t.read
+      , id: t._id
+      }
+
+
+defaultState :: State
+defaultState =
+  { thumbnails : fromFoldable []
+  }
+
+
+bookThumbnails :: Props -> R.ReactElement
+bookThumbnails props =
+  R.createElement component props []

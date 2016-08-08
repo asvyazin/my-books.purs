@@ -9,8 +9,10 @@ import Control.Monad.Trans (lift)
 import Data.Argonaut.Decode (class DecodeJson, decodeJson)
 import Data.Argonaut.Encode (class EncodeJson, encodeJson)
 import Data.Bifunctor (lmap)
+import Data.List (List)
 import Data.Maybe (Maybe)
 import Libs.PouchDB as DB
+import Libs.PouchDB.QueryItem (QueryItem)
 import Prelude
 
 
@@ -27,5 +29,15 @@ tryGetJson db objId = runMaybeT $ do
 
 
 putJson :: forall e a. EncodeJson a => DB.PouchDB -> a -> DB.PouchDBAff e Unit
-putJson db obj = do
+putJson db obj =
   void $ DB.put db $ encodeJson obj
+
+
+query :: forall e a options. DecodeJson a => DB.PouchDB -> String -> options -> DB.PouchDBAff e (DB.QueryResult (List (QueryItem a)))
+query db index opt = do
+  res <- DB.query' db index opt
+  newRows <- guardEither $ lmap error $ decodeJson res.rows
+  pure { offset: res.offset
+       , total_rows: res.total_rows
+       , rows: newRows
+       }

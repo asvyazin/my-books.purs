@@ -82,3 +82,19 @@ foreign import cancel :: forall e. PouchDBSync -> PouchDBEff e Unit
 
 
 foreign import debugEnable :: forall e. String -> PouchDBEff e Unit
+
+
+type QueryResult x =
+  { offset :: Int
+  , rows :: x
+  , total_rows :: Int
+  }
+
+
+foreign import queryFFI :: forall e a1 options. PouchDB -> String -> options -> PouchDBCallbackFFI e (QueryResult a1)
+
+
+query' :: forall e a2 options. PouchDB -> String -> options -> PouchDBAff e (QueryResult a2)
+query' db index opt =
+  makeAff $ queryFFI db index opt
+

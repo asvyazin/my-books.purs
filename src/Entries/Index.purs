@@ -9,12 +9,15 @@ import Components.AjaxLoader.AjaxLoader as AjaxLoader
 import Components.BooksDirectory as BooksDirectory
 import Components.BookThumbnails as BookThumbnails
 import Components.Header as Header
+import Control.Error.Util (hoistMaybe)
 import Control.Monad.Aff (launchAff, Aff)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Console (log, CONSOLE)
 import Control.Monad.Eff.Exception (EXCEPTION, Error, message)
 import Control.Monad.Error.Class (catchError)
+import Control.Monad.Maybe.Trans (runMaybeT)
+import Control.Monad.Trans (lift)
 import Data.Foldable (fold)
 import Data.Maybe (Maybe(Just, Nothing))
 import DOM (DOM)
@@ -68,8 +71,8 @@ spec =
       ]
     renderBooksDirectory _ _ _ _ = []
 
-    renderThumbnails _ _ (Just _) _ =
-      [ BookThumbnails.bookThumbnails ]
+    renderThumbnails _ _ (Just s) _ =
+      [ BookThumbnails.bookThumbnails { db: s.db } ]
     renderThumbnails _ _ _ _ =
       []
 
@@ -132,23 +135,19 @@ redirect url =
 
 
 updateUserInfoInDbIfNeeded :: forall e. PouchDB -> UserInfo -> PouchDBAff e Unit
-updateUserInfoInDbIfNeeded db (UserInfo info) = do
-  maybeUserInfo <- tryGetJson db info._id
-  case maybeUserInfo of
-    Nothing -> do
-      let
-        newUserInfo =
-          U.UserInfo
-          { _id : info._id
-          , _rev : Nothing
-          , displayName : info.displayName
-          }
-      putJson db newUserInfo
-    Just (U.UserInfo userInfo) ->
-      when (userInfo.displayName /= info.displayName) $ do
-        let
-          newUserInfo =
-            U.UserInfo userInfo
-            { displayName = info.displayName
-            }
-        putJson db newUserInfo
+updateUserInfoInDbIfNeeded db (UserInfo info) = void $ runMaybeT $ do
+  maybeUserInfo <- lift $ tryGetJson db info._id
+  newUserInfo <- hoistMaybe $ case maybeUserInfo of
+    Nothing ->
+      Just $ U.UserInfo
+      { _id : info._id
+      , _rev : Nothing
+      , displayName : info.displayName
+      }
+    Just (U.UserInfo userInfo) -> 
+      if (userInfo.displayName /= info.displayName)
+      then Just $ U.UserInfo userInfo
+           { displayName = info.displayName
+           }
+      else Nothing
+  lift $ putJson db newUserInfo
