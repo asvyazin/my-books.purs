@@ -85,7 +85,11 @@ spec' =
     renderBooksDirectory _ _ _ _ = []
 
     renderThumbnails _ props (Just s) _ =
-      [ BookThumbnails.bookThumbnails { db: s.db, currentPage: getCurrentPage props } ]
+      [ BookThumbnails.bookThumbnails
+        { db: s.db
+        , currentPage: getCurrentPage props
+        }
+      ]
     renderThumbnails _ _ _ _ =
       []
 

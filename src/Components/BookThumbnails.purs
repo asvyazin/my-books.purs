@@ -3,12 +3,14 @@ module Components.BookThumbnails where
 
 import Common.Data.BookInfo (BookInfo(BookInfo))
 import Common.React (foreachProps, mapPropsWithState)
+import Components.BookThumbnails.Pager as Pager
 import Components.BookThumbnails.Thumbnail as Thumbnail
 import Components.Wrappers.Col as Col
 import Components.Wrappers.Grid as Grid
 import Components.Wrappers.Row as Row
 import Control.Monad.Aff (launchAff)
 import Control.Monad.Eff.Class (liftEff)
+import Data.Foldable (fold)
 import Data.Lens (over)
 import Data.List (List, fromFoldable)
 import Data.Tuple (Tuple)
@@ -28,12 +30,21 @@ type Props =
 
 type State =
   { thumbnails :: List Thumbnail.Props
+  , pageCount :: Int
   }
 
 
 spec :: forall eff. T.Spec eff State Props (Tuple Int Thumbnail.Action)
 spec =
-  mapPropsWithState (\_ st -> st.thumbnails) thumbnailsPage
+  fold
+  [ mapPropsWithState (\_ st -> st.thumbnails) thumbnailsPage
+  , mapPropsWithState convertProps Pager.spec
+  ]
+  where
+    convertProps props state =
+      { currentPage : props.currentPage
+      , pageCount : state.pageCount
+      }
 
 
 thumbnailsPage :: forall eff state. T.Spec eff state (List Thumbnail.Props) (Tuple Int Thumbnail.Action)
@@ -61,17 +72,29 @@ thumbnailsPage =
 
 component :: R.ReactClass Props
 component =
-  R.createClass reactSpec.spec { componentDidMount = componentDidMount }
+  R.createClass reactSpec.spec
+  { componentDidMount = componentDidMount
+  , componentWillReceiveProps = componentWithReceiveProps
+  }
   where
     reactSpec =
       T.createReactSpec spec defaultState
 
     componentDidMount this = do
       props <- R.getProps this
+      reloadThumbnails this props
+
+    reloadThumbnails this props =
       void $ launchAff $ do
         res <- query props.db "books/all" { limit: pageSize, include_docs: true, skip: props.currentPage * pageSize }
         liftEff $ R.transformState this $ \state ->
-          state { thumbnails = map (getThumbnail <<< getDoc) res.rows }
+          state
+          { thumbnails = map (getThumbnail <<< getDoc) res.rows
+          , pageCount = (res.total_rows + 1) / pageSize
+          }
+
+    componentWithReceiveProps this newProps =
+      reloadThumbnails this newProps
 
     getThumbnail :: BookInfo -> Thumbnail.Props
     getThumbnail (BookInfo t) =
@@ -91,6 +114,7 @@ pageSize = 24
 defaultState :: State
 defaultState =
   { thumbnails : fromFoldable []
+  , pageCount : 0
   }
 
 

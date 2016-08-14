@@ -28,13 +28,17 @@ spec =
   where
     render dispatch props _ _ =
       [ Thumbnail.thumbnail
-        { src: props.imageUrl
-        , alt: props.size
-        , key: props.id
+        { src : props.imageUrl
+        , alt : props.size
+        , key : props.id
         }
         [ R.h3 [] [ R.text props.title ]
         , R.p [] [ R.text props.author ]
-        , Checkbox.checkbox { checked: props.isRead, onClick: dispatch ReadToggle } [ R.text "Read" ]
+        , Checkbox.checkbox
+          { checked : props.isRead
+          , onChange : dispatch ReadToggle
+          }
+          [ R.text "Read" ]
         ]
       ]
 
