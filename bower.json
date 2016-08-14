@@ -27,6 +27,7 @@
     "purescript-react-dom": "^1.0.0",
     "purescript-globals": "^1.1.0",
     "purescript-profunctor-lenses": "^1.0.0",
-    "purescript-argonaut-core": "^1.1.0"
+    "purescript-argonaut-core": "^1.1.0",
+    "purescript-integers": "^1.1.0"
   }
 }

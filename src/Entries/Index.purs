@@ -18,12 +18,17 @@ import Control.Monad.Eff.Exception (EXCEPTION, Error, message)
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Maybe.Trans (runMaybeT)
 import Control.Monad.Trans (lift)
+import Data.Argonaut.Core (Json)
+import Data.Argonaut.Decode.Class (decodeJson)
+import Data.Either (either)
 import Data.Foldable (fold)
-import Data.Maybe (Maybe(Just, Nothing))
+import Data.Lens ((^.))
+import Data.Maybe (Maybe(Just, Nothing), fromMaybe)
 import DOM (DOM)
 import DOM.HTML (window)
 import DOM.HTML.Location (setHref)
 import DOM.HTML.Window (location)
+import Entries.IndexProps (Props, params, page, defaultProps)
 import Global (encodeURIComponent)
 import Libs.PouchDB (POUCHDB, PouchDB, newPouchDB, sync, PouchDBAff)
 import Libs.PouchDB.Json (putJson, tryGetJson)
@@ -46,8 +51,16 @@ type State =
   Maybe LoadState
 
 
-spec :: forall eff props action. T.Spec (ajax :: AJAX, err :: EXCEPTION, pouchdb :: POUCHDB, dom :: DOM | eff) State props action
+spec :: forall eff action. T.Spec (ajax :: AJAX, err :: EXCEPTION, pouchdb :: POUCHDB, dom :: DOM | eff) State Json action
 spec =
+  mapProps convertProps spec'
+  where
+    convertProps =
+      either (const defaultProps) id <<< decodeJson
+
+
+spec' :: forall eff action. T.Spec (ajax :: AJAX, err :: EXCEPTION, pouchdb :: POUCHDB, dom :: DOM | eff) State Props action
+spec' =
   T.withState $ \st ->
                   case st of
                     Nothing ->
@@ -71,10 +84,13 @@ spec =
       ]
     renderBooksDirectory _ _ _ _ = []
 
-    renderThumbnails _ _ (Just s) _ =
-      [ BookThumbnails.bookThumbnails { db: s.db } ]
+    renderThumbnails _ props (Just s) _ =
+      [ BookThumbnails.bookThumbnails { db: s.db, currentPage: getCurrentPage props } ]
     renderThumbnails _ _ _ _ =
       []
+
+    getCurrentPage props =
+      fromMaybe 0 $ props ^. (params <<< page)
 
     convertToBooksDirectoryProps s =
       { onedriveToken: s.onedriveToken
@@ -82,7 +98,7 @@ spec =
       }
 
 
-component :: forall props. R.ReactClass props
+component :: R.ReactClass Json
 component =
   R.createClass reactSpec.spec { componentDidMount = componentDidMount }
   where
@@ -144,7 +160,7 @@ updateUserInfoInDbIfNeeded db (UserInfo info) = void $ runMaybeT $ do
       , _rev : Nothing
       , displayName : info.displayName
       }
-    Just (U.UserInfo userInfo) -> 
+    Just (U.UserInfo userInfo) ->
       if (userInfo.displayName /= info.displayName)
       then Just $ U.UserInfo userInfo
            { displayName = info.displayName

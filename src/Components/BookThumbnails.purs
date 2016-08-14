@@ -22,6 +22,7 @@ import Thermite as T
 
 type Props =
   { db :: PouchDB
+  , currentPage :: Int
   }
 
 
@@ -68,7 +69,7 @@ component =
     componentDidMount this = do
       props <- R.getProps this
       void $ launchAff $ do
-        res <- query props.db "books/all" { limit: 24, include_docs: true }
+        res <- query props.db "books/all" { limit: pageSize, include_docs: true, skip: props.currentPage * pageSize }
         liftEff $ R.transformState this $ \state ->
           state { thumbnails = map (getThumbnail <<< getDoc) res.rows }
 
@@ -81,6 +82,10 @@ component =
       , isRead: t.read
       , id: t._id
       }
+
+
+pageSize :: Int
+pageSize = 24
 
 
 defaultState :: State

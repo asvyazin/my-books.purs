@@ -18,6 +18,9 @@ spec =
         [ route { path : "/"
                 , component : Index.component
                 } []
+        , route { path : "/page/:page"
+                , component : Index.component
+                } []
         , route { path : "/login"
                 , component : Login.component
                 } []
