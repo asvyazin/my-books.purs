@@ -14,6 +14,8 @@ newtype BookInfo =
   { _id :: String
   , _rev :: Maybe String
   , read :: Boolean
+  , author :: Maybe String
+  , title :: Maybe String
   }
 
 
@@ -23,4 +25,6 @@ instance decodeJsonBookInfo :: DecodeJson BookInfo where
     _id <- o .? "_id"
     _rev <- o .?? "_rev"
     read <- o .? "read"
-    pure $ BookInfo { _id, _rev, read }
+    author <- o .?? "author"
+    title <- o .?? "title"
+    pure $ BookInfo { _id, _rev, read, author, title }
