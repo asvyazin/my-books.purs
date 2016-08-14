@@ -1,11 +1,10 @@
 module Common.Data.BookInfo where
 
 
-import Common.Json ((.??))
 import Control.Error.Util (note)
 import Data.Argonaut.Core (toObject)
 import Data.Argonaut.Decode (class DecodeJson)
-import Data.Argonaut.Decode.Combinators ((.?))
+import Data.Argonaut.Decode.Combinators ((.?), (.??))
 import Data.Maybe (Maybe)
 import Prelude
 

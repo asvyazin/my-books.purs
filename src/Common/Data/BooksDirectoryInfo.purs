@@ -1,11 +1,11 @@
 module Common.Data.BooksDirectoryInfo where
 
 
-import Common.Json ((.??), withRev)
+import Common.Json (withRev)
 import Control.Error.Util (note)
 import Data.Argonaut.Core (toObject, jsonEmptyObject)
 import Data.Argonaut.Decode (class DecodeJson)
-import Data.Argonaut.Decode.Combinators ((.?))
+import Data.Argonaut.Decode.Combinators ((.?), (.??))
 import Data.Argonaut.Encode (class EncodeJson)
 import Data.Argonaut.Encode.Combinators ((:=), (~>))
 import Data.Maybe (Maybe(Nothing))
