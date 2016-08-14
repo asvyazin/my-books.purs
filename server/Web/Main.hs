@@ -100,7 +100,7 @@ renderHtml =
 
 appPage :: H.Html
 appPage =
-  withMaster "/app.bundle.js" $ H.div H.! HA.class_ "application" $ ""
+  withMaster "/app.bundle.js" $ H.div H.! HA.class_ "application container-fluid" $ ""
 
 
 withMaster :: T.Text -> H.Html -> H.Html
