@@ -1,6 +1,7 @@
 module Components.AjaxLoader.AjaxLoader where
 
 
+import Data.Monoid ((<>))
 import React (ReactElement, createElement) as R
 import React.DOM (img) as R
 import React.DOM.Props as RP
@@ -17,7 +18,7 @@ spec =
     render _ _ _ _ =
       [ R.img
         [ RP.className "center-block text-center"
-        , RP.src ajaxLoaderGif
+        , RP.src ("/" <> ajaxLoaderGif)
         ]
         []
       ]
