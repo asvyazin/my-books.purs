@@ -42,7 +42,7 @@ executable MyBooks
                        monad-control,
                        mtl,
                        optparse-applicative,
-                       Spock,
+                       Spock-core,
                        text,
                        transformers,
                        wai,

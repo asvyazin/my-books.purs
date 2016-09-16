@@ -47,18 +47,18 @@ import qualified Text.Blaze.Html5 as H (Html,
                                         div,
                                         toValue)
 import qualified Text.Blaze.Html5.Attributes as HA
-import Web.Spock (runSpock,
-                  spockT,
-                  get,
-                  middleware,
-                  redirect,
-                  html,
-                  request,
-                  setCookie,
-                  defaultCookieSettings,
-                  json,
-                  hookAny,
-                  StdMethod(GET))
+import Web.Spock.Core (runSpock,
+                       spockT,
+                       get,
+                       middleware,
+                       redirect,
+                       html,
+                       request,
+                       setCookie,
+                       defaultCookieSettings,
+                       json,
+                       hookAny,
+                       StdMethod(GET))
 
 
 main :: IO ()
