@@ -8,6 +8,7 @@
   },
   "scripts": {
       "couchapp": "couchapp",
-      "install": "babel-node ./install.js"
+      "install": "babel-node ./install.js",
+      "install-user": "babel-node ./install-user.js"
   }
 }

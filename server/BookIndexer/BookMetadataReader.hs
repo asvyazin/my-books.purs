@@ -32,9 +32,9 @@ loadMetadata session filename itemId = do
     else
     return Nothing
   where
-    isEpub filename =
+    isEpub fn =
       let
-        ext = takeEnd 5 filename
+        ext = takeEnd 5 fn
       in
         ext == ".epub"
 
