@@ -14,6 +14,13 @@ exports.newPouchDB = function (name) {
 }
 
 
+exports.newPouchDBOpt = function (name, options) {
+    return function () {
+	return new PouchDB(name, options);
+    };
+}
+
+
 exports.putFFI = function (db) {
     return function (doc) {
 	return function (errorCallback) {

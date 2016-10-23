@@ -18,6 +18,7 @@ newtype ServerEnvironmentInfo =
   { baseUrl :: String
   , onedriveClientId :: String
   , couchdbServer :: String
+  , userCouchdbServer :: String
   }
 
 
@@ -27,7 +28,8 @@ instance decodeJsonServerEnvironmentInfo :: DecodeJson ServerEnvironmentInfo whe
     baseUrl <- o .? "baseUrl"
     onedriveClientId <- o .? "onedriveClientId"
     couchdbServer <- o .? "couchdbServer"
-    pure $ ServerEnvironmentInfo { baseUrl, onedriveClientId, couchdbServer }
+    userCouchdbServer <- o .? "userCouchdbServer"
+    pure $ ServerEnvironmentInfo { baseUrl, onedriveClientId, couchdbServer, userCouchdbServer }
 
 
 getServerEnvironment :: forall e. Aff (ajax :: AJAX | e) ServerEnvironmentInfo

@@ -30,6 +30,9 @@ type PouchDBCallbackFFI e a =
 foreign import newPouchDB :: forall e. String -> PouchDBEff e PouchDB
 
 
+foreign import newPouchDBOpt :: forall e options. String -> options -> PouchDBEff e PouchDB
+
+
 type PutResponse =
   { ok :: Boolean
   , id :: String

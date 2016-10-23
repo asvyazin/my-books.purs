@@ -30,7 +30,7 @@ import DOM.HTML.Location (setHref)
 import DOM.HTML.Window (location)
 import Entries.IndexProps (Props, params, page, defaultProps)
 import Global (encodeURIComponent)
-import Libs.PouchDB (POUCHDB, PouchDB, newPouchDB, sync, PouchDBAff)
+import Libs.PouchDB (POUCHDB, PouchDB, newPouchDBOpt, newPouchDB, sync, PouchDBAff)
 import Libs.PouchDB.Json (putJson, tryGetJson)
 import Network.HTTP.Affjax (AJAX)
 import Prelude
@@ -122,11 +122,11 @@ component =
                 dbName =
                   encodeURIComponent $ "my-books/" <> userInfo._id
                 remoteDbName =
-                  serverEnvironment.couchdbServer <> "/" <> dbName
+                  serverEnvironment.userCouchdbServer <> "/" <> dbName
                 globalDbName =
                   serverEnvironment.couchdbServer <> "/my-books"
               localDb <- liftEff $ newPouchDB dbName
-              remoteDb <- liftEff $ newPouchDB remoteDbName
+              remoteDb <- liftEff $ newPouchDBOpt remoteDbName { ajax: { headers: { "X-Onedrive-Token": onedriveToken } } }
               void $ liftEff $ sync localDb remoteDb { live: true, retry: true }
               globalDb <- liftEff $ newPouchDB globalDbName
               updateUserInfoInDbIfNeeded globalDb u
