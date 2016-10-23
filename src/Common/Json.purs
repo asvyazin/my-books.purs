@@ -4,7 +4,6 @@ module Common.Json where
 import Data.Argonaut.Core (Json)
 import Data.Argonaut.Encode.Combinators ((~>), (:=))
 import Data.Maybe (Maybe(Nothing, Just))
-import Prelude
 
 
 withRev :: Json -> Maybe String -> Json
