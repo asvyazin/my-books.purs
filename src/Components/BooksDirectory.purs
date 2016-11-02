@@ -19,11 +19,12 @@ import Control.Monad.Aff (Aff, launchAff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Exception (EXCEPTION)
 import Control.Monad.Maybe.Trans (runMaybeT)
-import Control.Monad.Trans (lift)
+import Control.Monad.Trans.Class (lift)
 import Control.Error.Util (hoistMaybe)
 import Data.Foldable (fold)
-import Data.Lens (LensP, over, lens, PrismP, prism', set, _Just, (^.))
+import Data.Lens (Lens', over, lens, Prism', prism', set, _Just, (^.))
 import Data.Maybe (Maybe(..), fromMaybe, maybe)
+import Data.Newtype (wrap)
 import Data.String as S
 import Data.Tuple (Tuple(..))
 import Libs.PouchDB (POUCHDB, PouchDB, PouchDBAff)
@@ -50,27 +51,27 @@ type State =
   }
 
 
-booksDir :: LensP State (Maybe DirectoryInfo)
+booksDir :: Lens' State (Maybe DirectoryInfo)
 booksDir =
   lens _.booksDir (_ { booksDir = _ })
 
 
-readDir :: LensP State (Maybe DirectoryInfo)
+readDir :: Lens' State (Maybe DirectoryInfo)
 readDir =
   lens _.readDir (_ { readDir = _ })
 
 
-stateLoaded :: LensP State Boolean
+stateLoaded :: Lens' State Boolean
 stateLoaded =
   lens _.stateLoaded (_ { stateLoaded = _ })
 
 
-booksModal :: LensP State ChooseDirectoryModal.State
+booksModal :: Lens' State ChooseDirectoryModal.State
 booksModal =
   lens _.booksModal (_ { booksModal = _ })
 
 
-readModal :: LensP State ChooseDirectoryModal.State
+readModal :: Lens' State ChooseDirectoryModal.State
 readModal =
   lens _.readModal (_ { readModal = _ })
 
@@ -81,7 +82,7 @@ type DirectoryInfo =
   }
 
 
-itemId_ :: LensP DirectoryInfo (Maybe String)
+itemId_ :: Lens' DirectoryInfo (Maybe String)
 itemId_ =
   lens _.itemId (_ { itemId = _ })
 
@@ -102,7 +103,7 @@ data Action
   | Save
 
 
-booksModalAction :: PrismP Action ChooseDirectoryModal.Action
+booksModalAction :: Prism' Action ChooseDirectoryModal.Action
 booksModalAction =
   prism' BooksModalAction getModal
   where
@@ -110,7 +111,7 @@ booksModalAction =
     getModal _ = Nothing
 
 
-readModalAction :: PrismP Action ChooseDirectoryModal.Action
+readModalAction :: Prism' Action ChooseDirectoryModal.Action
 readModalAction =
   prism' ReadModalAction getModel
   where
@@ -267,7 +268,7 @@ getDirectoryInfo token itemId = do
     getItem (OneDriveItem item) = item
     getPath (ItemReference reference) =
       let
-        idx = S.indexOf ":" reference.path
+        idx = S.indexOf (wrap ":") reference.path
       in
        maybe reference.path (\i -> S.drop (i + 1) reference.path) idx
 

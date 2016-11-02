@@ -6,7 +6,7 @@ import Data.Argonaut.Core (toObject)
 import Data.Argonaut.Decode (class DecodeJson)
 import Data.Argonaut.Decode.Combinators ((.?))
 import Data.Int (fromString)
-import Data.Lens (LensP, lens)
+import Data.Lens (Lens', lens)
 import Data.Maybe (Maybe(Nothing), maybe)
 import Prelude
 
@@ -17,7 +17,7 @@ newtype Props =
   }
 
 
-params :: LensP Props Params
+params :: Lens' Props Params
 params =
   lens get set
   where
@@ -38,7 +38,7 @@ newtype Params =
   }
 
 
-page :: LensP Params (Maybe Int)
+page :: Lens' Params (Maybe Int)
 page =
   lens get set
   where

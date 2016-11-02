@@ -13,10 +13,10 @@ import Control.Monad.Eff.Exception (EXCEPTION)
 import Control.Monad.Maybe.Trans (runMaybeT, lift)
 import Control.Monad.Rec.Class (forever)
 import Data.Foldable (foldl, fold)
-import Data.Lens (PrismP, LensP, view, over, prism', _2, set, lens, (^.), IsoP, iso)
+import Data.Lens (Prism', Lens', view, over, prism', _2, set, lens, Iso', iso)
 import Data.List (fromFoldable, (!!), modifyAt, findIndex, List, zip, zipWith, filter, null)
 import Data.Maybe (Maybe(Nothing, Just), fromMaybe, isJust)
-import Data.Monoid (mempty, (<>))
+import Data.Monoid (mempty)
 import Data.Tuple (Tuple(Tuple), fst)
 import Network.HTTP.Affjax (AJAX)
 import Prelude
@@ -45,39 +45,39 @@ type StateT =
 newtype State = State StateT 
 
 
-_State :: IsoP State StateT
+_State :: Iso' State StateT
 _State =
   iso getState State
   where
     getState (State s) = s
 
 
-collapsed :: LensP StateT Boolean
+collapsed :: Lens' StateT Boolean
 collapsed =
   lens _.collapsed (_ { collapsed = _ })
 
 
-loaded :: LensP StateT Boolean
+loaded :: Lens' StateT Boolean
 loaded =
   lens _.loaded (_ { loaded = _ })
 
 
-errorText :: LensP StateT (Maybe String)
+errorText :: Lens' StateT (Maybe String)
 errorText =
   lens _.errorText (_ { errorText = _ })
 
 
-children :: LensP StateT (List (Tuple Props State))
+children :: Lens' StateT (List (Tuple Props State))
 children =
   lens _.children (_ { children = _ })
 
 
-mapZip :: forall a b. LensP a b -> LensP (List a) (List b)
+mapZip :: forall a b. Lens' a b -> Lens' (List a) (List b)
 mapZip l =
   lens (map $ view l) (zipWith $ flip $ set l)
 
 
-childrenState :: LensP State (List State)
+childrenState :: Lens' State (List State)
 childrenState =
   _State <<< children <<< mapZip _2
 
@@ -88,7 +88,7 @@ data Action
   | ChildAction (Tuple (Maybe String) Action)
 
 
-childAction :: PrismP Action (Tuple (Maybe String) Action)
+childAction :: Prism' Action (Tuple (Maybe String) Action)
 childAction =
   prism' ChildAction fromChildAction
   where

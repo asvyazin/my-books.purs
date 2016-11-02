@@ -8,7 +8,7 @@ import Components.Wrappers.Modal as Modal
 import Control.Coroutine (cotransform)
 import Control.Monad.Eff.Exception (EXCEPTION)
 import Data.Foldable (fold)
-import Data.Lens (PrismP, LensP, lens, prism', over)
+import Data.Lens (Prism', Lens', lens, prism', over)
 import Data.Maybe (Maybe(Nothing, Just))
 import Data.Tuple (Tuple(Tuple))
 import Libs.PouchDB (POUCHDB, PouchDB) as DB
@@ -37,7 +37,7 @@ defaultState =
   }
 
 
-fileTreeState :: LensP State FileTree.State
+fileTreeState :: Lens' State FileTree.State
 fileTreeState =
   lens _.fileTreeState (_ { fileTreeState = _ })
 
@@ -48,7 +48,7 @@ data Action
   | FileTreeAction FileTree.Action
 
 
-fileTreeAction :: PrismP Action FileTree.Action
+fileTreeAction :: Prism' Action FileTree.Action
 fileTreeAction =
   prism' FileTreeAction getFileTreeAction
   where

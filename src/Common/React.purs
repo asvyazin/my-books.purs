@@ -4,7 +4,7 @@ module Common.React where
 import Control.Coroutine (transformCoTransformL, transformCoTransformR, transform)
 import Control.Monad.Maybe.Trans (runMaybeT)
 import Control.Monad.Rec.Class (forever)
-import Control.Monad.Trans (lift)
+import Control.Monad.Trans.Class (lift)
 import Control.Error.Util (hoistMaybe)
 import Data.Lens (view)
 import Data.List (List(..), (!!))
