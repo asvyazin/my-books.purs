@@ -10,6 +10,7 @@ import qualified BookIndexer.BookMetadataReader as BM (loadMetadata, BookMetadat
 import BookIndexer.IndexerState (IndexerState(IndexerState), lastSeq, indexerStateId)
 import BookIndexer.Types.BookInfo (BookInfo(BookInfo), read_, author, title)
 import qualified BookIndexer.Types.BookInfo as BI (token)
+import CouchDB.Types.Auth (Auth(NoAuth, BasicAuth))
 import CouchDB.Types.Seq (Seq)
 import Common.BooksDirectoryInfo (BooksDirectoryInfo, booksDirectoryInfoId, booksItemId, readItemId, defaultBooksDirectoryInfo)
 import Common.Database (usersDatabaseName, indexerDatabaseName, userDatabaseName, usersFilter)
@@ -32,7 +33,8 @@ import Control.Monad.Reader (runReaderT)
 import Control.Monad.Reader.Class (MonadReader(ask))
 import Control.Monad.State (runStateT)
 import Control.Monad.State.Class (MonadState(get, put))
-import Control.Monad.Trans.Maybe (runMaybeT)
+import Control.Monad.Trans.Maybe (runMaybeT, MaybeT(MaybeT))
+import Data.ByteString.Char8 (ByteString, pack)
 import Data.Conduit (($$), (=$=))
 import qualified Data.Conduit.Combinators as DC (last, mapM_, concatMapM)
 import Data.Maybe (fromJust, isNothing, maybe, fromMaybe)
@@ -46,6 +48,7 @@ import qualified Onedrive.Types.ItemReference as IR (id_)
 import Onedrive.Types.OnedriveItem (name, id_, parentReference, OnedriveItem, folder)
 import Onedrive.Types.OauthTokenRequest (OauthTokenRequest(OauthTokenRequest))
 import Onedrive.Types.OauthTokenResponse (accessToken)
+import System.Environment (lookupEnv)
 
 
 type UserSynchronizers =
@@ -57,15 +60,16 @@ main = do
   serverEnv <- getServerEnvironment
   let couchdb = serverEnv ^. couchdbServer
   userSynchronizers <- atomically $ newTVar []
-  state <- getObject couchdb indexerDatabaseName indexerStateId
+  auth <- getAuth
+  state <- getObject couchdb indexerDatabaseName auth indexerStateId
   let
     ls = view lastSeq <$> state
-  maybeNewLastSeq <- runReaderT (watchNewUsersLoop userSynchronizers ls) serverEnv
+  maybeNewLastSeq <- runReaderT (watchNewUsersLoop userSynchronizers auth ls) serverEnv
   case maybeNewLastSeq of
     Nothing ->
       return ()
     Just newLastSeq ->
-      putObject couchdb indexerDatabaseName indexerStateId $ newIndexerState state newLastSeq
+      putObject couchdb indexerDatabaseName auth indexerStateId $ newIndexerState state newLastSeq
 
 
 newIndexerState :: Maybe IndexerState -> Seq -> IndexerState
@@ -75,8 +79,8 @@ newIndexerState current ls =
 
 watchNewUsersLoop :: (MonadMask  m
                      , MonadReader ServerEnvironmentInfo m
-                     , MonadIO m) => UserSynchronizers -> Maybe Seq -> m (Maybe Seq)
-watchNewUsersLoop userSynchronizers ls = do
+                     , MonadIO m) => UserSynchronizers -> Auth -> Maybe Seq -> m (Maybe Seq)
+watchNewUsersLoop userSynchronizers auth ls = do
   env <- ask
   let
     watchParams =
@@ -86,45 +90,45 @@ watchNewUsersLoop userSynchronizers ls = do
       , _since = ls
       , _filter = Just usersFilter
       }
-  watchChanges watchParams (DC.concatMapM (processWatchItem userSynchronizers) =$= DC.last) -- TODO: catch exceptions
+  watchChanges watchParams (DC.concatMapM (processWatchItem userSynchronizers auth) =$= DC.last) -- TODO: catch exceptions
 
 
 processWatchItem :: (MonadIO m
                     , MonadReader ServerEnvironmentInfo m
-                    , MonadThrow m) => UserSynchronizers -> DocumentChange -> m (Maybe Seq)
-processWatchItem userSynchronizers documentChange = runMaybeT $ do
-  ui <- getUserInfo documentChange >>= hoistMaybe
-  processUser userSynchronizers ui
+                    , MonadThrow m) => UserSynchronizers -> Auth -> DocumentChange -> m (Maybe Seq)
+processWatchItem userSynchronizers auth documentChange = runMaybeT $ do
+  ui <- MaybeT $ getUserInfo auth documentChange
+  processUser userSynchronizers auth ui
   hoistMaybe Nothing
 
 
-getUserInfo :: (MonadIO m, MonadThrow m, MonadReader ServerEnvironmentInfo m) => DocumentChange -> m (Maybe UserInfo)
-getUserInfo documentChange = do
+getUserInfo :: (MonadIO m, MonadThrow m, MonadReader ServerEnvironmentInfo m) => Auth -> DocumentChange -> m (Maybe UserInfo)
+getUserInfo auth documentChange = do
   env <- ask
   let
     couchdb = env ^. couchdbServer
     docId = documentChange ^. W._id
-  getObject couchdb usersDatabaseName docId
+  getObject couchdb usersDatabaseName auth docId
 
 
-processUser :: (MonadIO m, MonadReader ServerEnvironmentInfo m) => UserSynchronizers -> UserInfo -> m ()
-processUser userSynchronizers userInfo = do
+processUser :: (MonadIO m, MonadReader ServerEnvironmentInfo m) => UserSynchronizers -> Auth -> UserInfo -> m ()
+processUser userSynchronizers auth userInfo = do
   env <- ask
-  synchronizer <- liftIO $ async $ runReaderT (synchronizeUserLoop userInfo) env
+  synchronizer <- liftIO $ async $ runReaderT (synchronizeUserLoop auth userInfo) env
   liftIO $ atomically $ modifyTVar userSynchronizers (synchronizer :)
   return ()
 
 
-synchronizeUserLoop :: (MonadCatch m, MonadIO m, MonadReader ServerEnvironmentInfo m) => UserInfo -> m ()
-synchronizeUserLoop userInfo = do
+synchronizeUserLoop :: (MonadCatch m, MonadIO m, MonadReader ServerEnvironmentInfo m) => Auth -> UserInfo -> m ()
+synchronizeUserLoop auth userInfo = do
   serverEnv <- ask
   let
     couchdb =
       serverEnv ^. couchdbServer
     userDatabaseId =
       userDatabaseName $ userInfo ^. U._id
-  onedriveInfo <- fromMaybe defaultOnedriveInfo <$> getObject couchdb userDatabaseId onedriveInfoId
-  booksDirectoryInfo <- fromMaybe defaultBooksDirectoryInfo <$> getObject couchdb userDatabaseId booksDirectoryInfoId
+  onedriveInfo <- fromMaybe defaultOnedriveInfo <$> getObject couchdb userDatabaseId auth onedriveInfoId
+  booksDirectoryInfo <- fromMaybe defaultBooksDirectoryInfo <$> getObject couchdb userDatabaseId auth booksDirectoryInfoId
   let
     tok =
       onedriveInfo ^. token
@@ -202,8 +206,8 @@ synchronizeUserLoop userInfo = do
               BookInfo bookInfoId Nothing isRead bookInfoToken a t
             updateBook =
               set BI.token bookInfoToken . set read_ isRead . set author a . set title t
-          newBook <- maybe defaultBook updateBook <$> getObject couchdb userDatabaseId itemId
-          putObject couchdb userDatabaseId itemId newBook
+          newBook <- maybe defaultBook updateBook <$> getObject couchdb userDatabaseId auth itemId
+          putObject couchdb userDatabaseId auth itemId newBook
 
       (readSet, processedSet) <- get
       unless (S.member currentId processedSet) $ do
@@ -231,3 +235,18 @@ synchronizeUserLoop userInfo = do
             else readSet
         put (newReadSet, newProcessedSet)
       return ()
+
+
+getAuth :: IO Auth
+getAuth =
+  maybe NoAuth auth <$> tryGetAdminAuth
+  where
+    auth (username, password) =
+      BasicAuth username password
+
+
+tryGetAdminAuth :: IO (Maybe (ByteString, ByteString))
+tryGetAdminAuth = runMaybeT $ do
+  username <- MaybeT $ lookupEnv "COUCHDB_ADMIN_USERNAME"
+  password <- MaybeT $ lookupEnv "COUCHDB_ADMIN_PASSWORD"
+  return (pack username, pack password)

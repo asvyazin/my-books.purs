@@ -13,7 +13,10 @@ import Control.Monad (when, void)
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.Maybe (runMaybeT, MaybeT(MaybeT))
 import CouchDB.Requests (getObject, putObject)
+import CouchDB.Types.Auth (Auth(NoAuth, BasicAuth))
+import Data.ByteString.Char8 (ByteString, pack)
 import Data.Maybe (fromJust, fromMaybe)
 import Data.Monoid ((<>))
 import qualified Data.Text as T (Text, concat)
@@ -100,7 +103,7 @@ renderHtml =
 
 appPage :: H.Html
 appPage =
-  withMaster "/app.bundle.js" $ H.div H.! HA.class_ "application container-fluid" $ ""
+  withMaster "/app.bundle.js" $ H.div H.! HA.class_ "application container" $ ""
 
 
 withMaster :: T.Text -> H.Html -> H.Html
@@ -140,12 +143,28 @@ updateOnedriveInfoSync couchdbUrl resp = do
 
 updateOnedriveInfoIfNeeded :: (MonadThrow m, MonadIO m) => T.Text -> T.Text -> Resp.OauthTokenResponse -> m ()
 updateOnedriveInfoIfNeeded couchdbUrl userId tokenResp = do
+  auth <- getAuth
   let
     databaseId = userDatabaseName userId
     newToken = tokenResp ^. Resp.accessToken
     newRefreshToken = tokenResp ^. Resp.refreshToken
-  currentInfo <- fromMaybe defaultOnedriveInfo <$> getObject couchdbUrl databaseId onedriveInfoId
+  currentInfo <- fromMaybe defaultOnedriveInfo <$> getObject couchdbUrl databaseId auth onedriveInfoId
   when ((currentInfo ^. token) /= newToken || (currentInfo ^. Common.OnedriveInfo.refreshToken) /= newRefreshToken) $ do
     let
       newInfo = set Common.OnedriveInfo.refreshToken newRefreshToken $ set token newToken currentInfo
-    putObject couchdbUrl databaseId onedriveInfoId newInfo
+    putObject couchdbUrl databaseId auth onedriveInfoId newInfo
+
+
+getAuth :: MonadIO m => m Auth
+getAuth =
+  maybe NoAuth auth <$> tryGetAdminAuth
+  where
+    auth (username, password) =
+      BasicAuth username password
+
+
+tryGetAdminAuth :: MonadIO m => m (Maybe (ByteString, ByteString))
+tryGetAdminAuth = runMaybeT $ do
+  username <- MaybeT $ liftIO $ lookupEnv "COUCHDB_ADMIN_USERNAME"
+  password <- MaybeT $ liftIO $ lookupEnv "COUCHDB_ADMIN_PASSWORD"
+  return (pack username, pack password)
