@@ -18,18 +18,19 @@ import Network.HTTP.Simple ( defaultRequest
                            , setRequestMethod
                            , setRequestPath
                            , setRequestQueryString
+                           , setRequestBodyLBS
                            , httpLBS
                            , getResponseStatus
                            , getResponseHeaders
                            , getResponseBody )
 import Network.HTTP.Types.Header (HeaderName)
-import Network.Wai (requestHeaders, requestMethod, rawPathInfo, queryString)
+import Network.Wai (requestHeaders, requestMethod, rawPathInfo, queryString, lazyRequestBody)
 import Onedrive.Session (newSessionWithToken)
 import Onedrive.Types.UserInfo (UserInfo, id_)
 import Onedrive.User (me)
 import System.Environment (lookupEnv)
 import Web.Spock.Action (request, setStatus, setHeader, lazyBytes)
-import Web.Spock.Core (hookAny, runSpock, spockT, StdMethod(GET, POST, PUT, DELETE))
+import Web.Spock.Core (hookAny, runSpock, spockT, StdMethod(GET, POST, PUT, DELETE, OPTIONS))
 
 
 main :: IO ()
@@ -40,39 +41,48 @@ main = do
     hookAny POST processRequest
     hookAny PUT processRequest
     hookAny DELETE processRequest
+    hookAny OPTIONS processRequest
     where
       processRequest _ = do
         req <- request
         let
           headers = requestHeaders req
           maybeHeader = find ((== onedriveTokenHeaderName) . fst) headers
-        case maybeHeader of
+          maybeOnedriveToken = snd <$> maybeHeader
+          method = requestMethod req
+        newHeaders <- updateHeaders headers maybeOnedriveToken method
+        body <- liftIO $ lazyRequestBody req
+        let
+          newRequest =
+            setRequestBodyLBS body $
+            setRequestQueryString (queryString req) $
+            setRequestPath (rawPathInfo req) $
+            setRequestMethod method $
+            setRequestSecure False $
+            setRequestHost "localhost" $
+            setRequestPort 5984 $
+            setRequestHeaders newHeaders defaultRequest
+        resp <- httpLBS newRequest
+        setStatus $ getResponseStatus resp
+        mapM_ (uncurry setHeader) $ map convertHeader $ getResponseHeaders resp
+        lazyBytes $ getResponseBody resp
+      convertHeader (k, v) =
+        (decodeUtf8 (original k), decodeUtf8 v)
+      updateHeaders headers onedriveToken _ =
+        case onedriveToken of
           Nothing ->
-            undefined
-          Just (_, onedriveTokenBS) -> do
-            liftIO $ putStrLn $ "onedriveToken found: " ++ unpack onedriveTokenBS
-            userInfo <- liftIO $ getUserByToken onedriveTokenBS
+            return headers
+          Just token -> do
+            liftIO $ putStrLn $ "onedriveToken found: " ++ unpack token
+            userInfo <- liftIO $ getUserByToken token
             let userId = userInfo ^. id_
             liftIO $ putStrLn $ "userId: " ++ T.unpack userId
             let
               newHeaders =
                 (couchdbRolesHeaderName, "users") :
                 (couchdbUserNameHeaderName, encodeUtf8 userId) :
-                headers 
-              newRequest =
-                setRequestQueryString (queryString req) $
-                setRequestPath (rawPathInfo req) $
-                setRequestMethod (requestMethod req) $
-                setRequestSecure False $
-                setRequestHost "localhost" $
-                setRequestPort 5984 $
-                setRequestHeaders newHeaders defaultRequest
-            resp <- httpLBS newRequest
-            setStatus $ getResponseStatus resp
-            mapM_ (uncurry setHeader) $ map convertHeader $ getResponseHeaders resp
-            lazyBytes $ getResponseBody resp
-      convertHeader (k, v) =
-        (decodeUtf8 (original k), decodeUtf8 v)
+                headers
+            return newHeaders
 
 
 getPort :: IO Int

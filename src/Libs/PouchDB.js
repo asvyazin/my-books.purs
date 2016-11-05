@@ -11,14 +11,16 @@ exports.newPouchDB = function (name) {
     return function () {
 	return new PouchDB(name);
     };
-}
+};
 
 
-exports.newPouchDBOpt = function (name, options) {
-    return function () {
-	return new PouchDB(name, options);
+exports.newPouchDBOpt = function (name) {
+    return function (options) {
+	return function () {
+	    return new PouchDB(name, options);
+	};
     };
-}
+};
 
 
 exports.putFFI = function (db) {
@@ -37,7 +39,7 @@ exports.putFFI = function (db) {
 	    };
 	};
     };
-}
+};
 
 
 exports.postFFI = function (db) {
@@ -56,7 +58,7 @@ exports.postFFI = function (db) {
 	    };
 	};
     };
-}
+};
 
 
 exports.getFFI = function (db) {
@@ -75,7 +77,7 @@ exports.getFFI = function (db) {
 	    };
 	};
     };
-}
+};
 
 
 exports.tryGetFFI = function (db) {
@@ -94,7 +96,7 @@ exports.tryGetFFI = function (db) {
 	    };
 	};
     };
-}
+};
 
 
 exports.sync = function (src) {
@@ -102,24 +104,24 @@ exports.sync = function (src) {
 	return function (options) {
 	    return function () {
 		return PouchDB.sync(src, dest, options);
-	    }
-	}
-    }
-}
+	    };
+	};
+    };
+};
 
 
 exports.cancel = function (sync) {
     return function () {
 	return sync.cancel();
     };
-}
+};
 
 
 exports.debugEnable = function (str) {
     return function () {
 	return PouchDB.debugEnable(str);
     };
-}
+};
 
 
 exports.queryFFI = function (db) {
@@ -140,4 +142,4 @@ exports.queryFFI = function (db) {
 	    };
 	};
     };
-}
+};

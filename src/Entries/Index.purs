@@ -22,6 +22,7 @@ import Data.Argonaut.Core (Json)
 import Data.Argonaut.Decode.Class (decodeJson)
 import Data.Either (either)
 import Data.Foldable (fold)
+import Data.Foreign (writeObject, Prop(..), toForeign)
 import Data.Lens ((^.))
 import Data.Maybe (Maybe(Just, Nothing), fromMaybe)
 import DOM (DOM)
@@ -124,11 +125,14 @@ component =
                 remoteDbName =
                   serverEnvironment.userCouchdbServer <> "/" <> dbName
                 globalDbName =
-                  serverEnvironment.couchdbServer <> "/my-books"
+                  serverEnvironment.userCouchdbServer <> "/my-books"
               localDb <- liftEff $ newPouchDB dbName
-              remoteDb <- liftEff $ newPouchDBOpt remoteDbName { ajax: { headers: { "X-Onedrive-Token": onedriveToken } } }
+              let
+                authHeaders =
+                  writeObject [ Prop { key: "X-Onedrive-Token", value: toForeign onedriveToken } ]
+              remoteDb <- liftEff $ newPouchDBOpt remoteDbName { ajax: { headers: authHeaders } }
               void $ liftEff $ sync localDb remoteDb { live: true, retry: true }
-              globalDb <- liftEff $ newPouchDB globalDbName
+              globalDb <- liftEff $ newPouchDBOpt globalDbName { ajax: { headers: authHeaders } }
               updateUserInfoInDbIfNeeded globalDb u
               let
                 newState =

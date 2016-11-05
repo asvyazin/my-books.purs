@@ -14,6 +14,7 @@ data ServerEnvironmentInfo =
   { _appBaseUrl :: T.Text
   , _onedriveClientId :: T.Text
   , _couchdbServer :: T.Text
+  , _userCouchdbServer :: T.Text
   }
 
 
@@ -21,16 +22,17 @@ makeLenses ''ServerEnvironmentInfo
 
 
 instance ToJSON ServerEnvironmentInfo where
-  toJSON (ServerEnvironmentInfo baseUrl clientId couchdb) =
+  toJSON (ServerEnvironmentInfo baseUrl clientId couchdb userCouchdb) =
     object [ "baseUrl" .= baseUrl
            , "onedriveClientId" .= clientId
            , "couchdbServer" .= couchdb
+           , "userCouchdbServer" .= userCouchdb
            ]
 
 
 getServerEnvironment :: IO ServerEnvironmentInfo
 getServerEnvironment =
-  ServerEnvironmentInfo <$> getAppBaseUrl <*> getOnedriveClientId <*> getCouchdbServer
+  ServerEnvironmentInfo <$> getAppBaseUrl <*> getOnedriveClientId <*> getCouchdbServer <*> getUserCouchdbServer
 
 
 getOnedriveClientId :: IO T.Text
@@ -46,3 +48,8 @@ getAppBaseUrl =
 getCouchdbServer :: IO T.Text
 getCouchdbServer =
   maybe "http://localhost:5984" T.pack <$> lookupEnv "COUCHDB_SERVER"
+
+
+getUserCouchdbServer :: IO T.Text
+getUserCouchdbServer =
+  maybe "http://localhost:8001" T.pack <$> lookupEnv "COUCHDB_USER_SERVER"
