@@ -10,7 +10,16 @@ async function main() {
 	auth: { username, password }
     });
 
+    const proxyDb = new PouchDB('http://localhost:5984/my-books-proxy', {
+	auth: { username, password }
+    });
+
     try {
+	await db.security().reset({
+	    members: {
+		roles: [ 'users' ]
+	    }
+	}).save();
 	await putAlways(db, {
 	    _id: '_design/users',
 	    filters: {
@@ -19,12 +28,26 @@ async function main() {
 		}.toString()
 	    }
 	});
-	await db.security().reset({
+	console.log('my-books database initialized');
+
+	await proxyDb.security().reset({
 	    members: {
-		roles: [ 'users' ]
+		names: [ 'admin' ]
 	    }
 	}).save();
-	console.log('my-books database initialized');
+	await putAlways(proxyDb, {
+	    _id: '_design/users',
+	    views: {
+		'by-token': {
+		    map: function (doc) {
+			if (doc.type === 'userToken') {
+			    emit(doc.token, null);
+			}
+		    }.toString()
+		}
+	    }
+	});
+	console.log('my-books-proxy database initialized');
 
 	db.changes({
 	    filter: 'users/all',
@@ -37,6 +60,11 @@ async function main() {
 	    });
 
 	    try {
+		await userDb.security().reset({
+		    members: {
+			names: [ c.id ]
+		    }
+		}).save();
 		await putAlways(userDb, {
 		    _id: '_design/books',
 		    views: {
@@ -48,14 +76,8 @@ async function main() {
 			    }.toString()
 			}
 		    }
-		});
-		await userDb.security().reset({
-		    members: {
-			names: [ c.id ]
-		    }
-		}).save();
-		
-		console.log('User database initialized', c.id);
+		});		
+		console.log(`my-books%2F${c.id} database initialized`);
 	    } catch (err) {
 		console.error('Error initializing user database:', err, 'userId:', c.id);
 	    }

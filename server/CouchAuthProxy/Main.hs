@@ -2,12 +2,20 @@
 module Main(main) where
 
 
-import Control.Lens ((^.))
-import Control.Monad.Catch (MonadThrow)
+import Control.Lens ((^.), set)
 import Control.Monad.IO.Class (MonadIO(liftIO))
-import Data.ByteString.Char8 (unpack, ByteString)
+import Control.Monad.Trans.Maybe (runMaybeT, MaybeT(MaybeT))
+import CouchAuthProxy.UserToken (UserToken(..))
+import CouchDB.Requests (putObject, getObject)
+import CouchDB.Types.Auth (Auth(..))
+import CouchDB.Types.Views (defaultViewQueryParameters, key, limit, rows, ViewResult)
+import qualified CouchDB.Types.Views as V (id_)
+import CouchDB.Views (getView)
+import Data.Aeson (Value)
+import Data.ByteString.Char8 (unpack, pack, ByteString)
 import Data.CaseInsensitive (CI(original))
 import Data.List (find)
+import Data.Text (Text)
 import qualified Data.Text as T (unpack)
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Network.HTTP.Simple ( defaultRequest
@@ -74,8 +82,7 @@ main = do
             return headers
           Just token -> do
             liftIO $ putStrLn $ "onedriveToken found: " ++ unpack token
-            userInfo <- liftIO $ getUserByToken token
-            let userId = userInfo ^. id_
+            userId <- liftIO $ getUserIdByToken token
             liftIO $ putStrLn $ "userId: " ++ T.unpack userId
             let
               newHeaders =
@@ -94,15 +101,88 @@ onedriveTokenHeaderName :: HeaderName
 onedriveTokenHeaderName = "X-Onedrive-Token"
 
 
-getUserByToken :: (MonadThrow m, MonadIO m) => ByteString -> m UserInfo
-getUserByToken tokenBS = do
-  session <- liftIO $ newSessionWithToken $ decodeUtf8 tokenBS
-  me session 
-
-
 couchdbRolesHeaderName :: HeaderName
 couchdbRolesHeaderName = "X-Auth-CouchDB-Roles"
 
 
 couchdbUserNameHeaderName :: HeaderName
 couchdbUserNameHeaderName = "X-Auth-CouchDB-UserName"
+
+
+getUserIdByToken :: ByteString -> IO Text
+getUserIdByToken tokenBS = do
+  let
+    token = decodeUtf8 tokenBS
+  maybeUserId <- tryGetUserIdFromCouchDB token
+  case maybeUserId of
+    Nothing -> do
+      userInfo <- getUserByToken tokenBS
+      let
+        userId = userInfo ^. id_
+      putUserIdToCouchDB token userId
+      return userId
+    Just userId ->
+      return userId
+
+
+tryGetUserIdFromCouchDB :: Text -> IO (Maybe Text)
+tryGetUserIdFromCouchDB token = do
+  auth <- getAuth
+  let
+    params =
+      set key (Just token) $
+      set limit (Just 1)
+      defaultViewQueryParameters
+    loadViewResult :: IO (ViewResult Text Value)
+    loadViewResult = getView proxyCouchDBServer proxyDatabaseName auth "users" "by-token" params
+  res <- loadViewResult
+  case res ^. rows of
+    [] ->
+      return Nothing
+    [r] ->
+      return $ Just $ r ^. V.id_
+    _ ->
+      error "Invalid users/by-token response"
+
+
+putUserIdToCouchDB :: Text -> Text -> IO ()
+putUserIdToCouchDB token userId = do
+  auth <- getAuth
+  oldObj <- getObject proxyCouchDBServer proxyDatabaseName auth userId
+  let
+    rev =
+      oldObj >>= userTokenRev
+    obj =
+      UserToken userId rev token
+  putObject proxyCouchDBServer proxyDatabaseName auth userId obj
+
+
+getAuth :: IO Auth
+getAuth =
+  maybe NoAuth auth <$> tryGetAdminAuth
+  where
+    auth (username, password) =
+      BasicAuth username password
+
+
+tryGetAdminAuth :: IO (Maybe (ByteString, ByteString))
+tryGetAdminAuth = runMaybeT $ do
+  username <- MaybeT $ lookupEnv "COUCHDB_ADMIN_USERNAME"
+  password <- MaybeT $ lookupEnv "COUCHDB_ADMIN_PASSWORD"
+  return (pack username, pack password)
+
+
+proxyCouchDBServer :: Text
+proxyCouchDBServer =
+  "http://localhost:5984"
+
+
+proxyDatabaseName :: Text
+proxyDatabaseName =
+  "my-books-proxy"
+
+
+getUserByToken :: ByteString -> IO UserInfo
+getUserByToken tokenBS = do
+  session <- newSessionWithToken $ decodeUtf8 tokenBS
+  me session 

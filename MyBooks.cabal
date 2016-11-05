@@ -92,8 +92,10 @@ executable BookIndexer
 
 executable CouchAuthProxy
            main-is:             CouchAuthProxy/Main.hs
+           other-modules:       CouchAuthProxy.UserToken
            ghc-options:         -threaded -rtsopts -with-rtsopts=-N
-           build-depends:       base,
+           build-depends:       aeson,
+                                base,
                                 bytestring,
                                 case-insensitive,
                                 exceptions,
@@ -104,6 +106,7 @@ executable CouchAuthProxy
                                 lens,
                                 Spock-core,
                                 text,
+                                transformers,
                                 wai
            hs-source-dirs:      server
            default-language:    Haskell2010
