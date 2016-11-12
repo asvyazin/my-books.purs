@@ -30,6 +30,6 @@
     "purescript-profunctor-lenses": "^2.0.0",
     "purescript-react-dom": "^2.0.0",
     "purescript-thermite": "^3.0.0",
-    "purescript-transformers": "^2.0.1"
+    "purescript-transformers": "^2.0.2"
   }
 }
