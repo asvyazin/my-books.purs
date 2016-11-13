@@ -5,7 +5,8 @@
   "scripts": {
     "webpack": "webpack",
     "bower": "bower",
-    "postinstall": "bower install --allow-root && webpack"
+      "postinstall": "bower install --allow-root && webpack",
+      "psc-ide-server": "psc-ide-server"
   },
   "keywords": [
     "purescript",
