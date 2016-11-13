@@ -3,8 +3,9 @@
 module BookIndexer.BookMetadataReader where
 
 
-import Codec.Epub (getPkgPathXmlFromBS, getMetadata)
+import Codec.Epub (getPkgPathXmlFromBS, getMetadata, getPackage)
 import Codec.Epub.Data.Metadata (Metadata(..), Creator(..), Title(..))
+import Codec.Epub.Data.Package (Package(pkgVersion))
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Error.Class (MonadError)
@@ -18,6 +19,7 @@ data BookMetadata =
   BookMetadata
   { author :: Text
   , title :: Text
+  , epubVersion :: Text
   }
 
 
@@ -27,8 +29,11 @@ loadMetadata session filename itemId = do
     then do
     c <- content session itemId
     (_, xmlString) <- getPkgPathXmlFromBS $ BL.toStrict c
+    package <- getPackage xmlString
     metadata <- getMetadata xmlString
-    return $ Just $ BookMetadata (getAuthor metadata) (getTitle metadata)
+    let
+      epubVsn = pack $ pkgVersion package
+    return $ Just $ BookMetadata (getAuthor metadata) (getTitle metadata) epubVsn
     else
     return Nothing
   where

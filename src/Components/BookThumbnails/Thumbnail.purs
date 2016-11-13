@@ -3,6 +3,10 @@ module Components.BookThumbnails.Thumbnail where
 
 import Components.Wrappers.Checkbox as Checkbox
 import Components.Wrappers.Thumbnail as Thumbnail
+import Control.Applicative ((<$>))
+import Data.Array (catMaybes)
+import Data.Maybe (Maybe(Just))
+import Data.Monoid ((<>))
 import React (ReactElement, createElement) as R
 import React.DOM (h3, text, p) as R
 import Thermite as T
@@ -15,6 +19,7 @@ type Props =
   , title :: String
   , author :: String
   , isRead :: Boolean
+  , epubVersion :: Maybe String
   }
 
 
@@ -27,20 +32,33 @@ spec =
   T.simpleSpec T.defaultPerformAction render
   where
     render dispatch props _ _ =
-      [ Thumbnail.thumbnail
-        { src : props.imageUrl
-        , alt : props.size
-        , key : props.id
-        }
-        [ R.h3 [] [ R.text props.title ]
-        , R.p [] [ R.text props.author ]
-        , Checkbox.checkbox
-          { checked : props.isRead
-          , onChange : dispatch ReadToggle
+      let
+        children = catMaybes
+          [ Just (renderTitle props.title)
+          , Just (renderAuthor props.author)
+          , renderEpubVersion <$> props.epubVersion
+          , Just (renderIsRead dispatch props.isRead)
+          ]
+      in
+        [ Thumbnail.thumbnail
+          { src : props.imageUrl
+          , alt : props.size
+          , key : props.id
           }
-          [ R.text "Read" ]
+          children
         ]
-      ]
+    renderTitle title =
+      R.h3 [] [ R.text title ]
+    renderAuthor author =
+      R.p [] [ R.text author ]
+    renderEpubVersion version =
+      R.p [] [ R.text ("EPUB: " <> version) ]
+    renderIsRead dispatch isRead =
+      Checkbox.checkbox
+      { checked : isRead
+      , onChange : dispatch ReadToggle
+      }
+      [ R.text "Read" ]
 
 
 thumbnail :: Props -> R.ReactElement

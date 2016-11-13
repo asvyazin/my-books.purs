@@ -3,15 +3,10 @@
 module Main (main) where
 
 
-import CouchDB.Changes.Watcher (watchChanges, WatchParams(..), DocumentChange)
-import qualified CouchDB.Changes.Watcher as W (_id)
-import CouchDB.Requests (getObject, putObject)
-import qualified BookIndexer.BookMetadataReader as BM (loadMetadata, BookMetadata(author, title))
+import qualified BookIndexer.BookMetadataReader as BM (loadMetadata, BookMetadata(author, title, epubVersion))
 import BookIndexer.IndexerState (IndexerState(IndexerState), lastSeq, indexerStateId)
-import BookIndexer.Types.BookInfo (BookInfo(BookInfo), read_, author, title)
+import BookIndexer.Types.BookInfo (BookInfo(BookInfo), read_, author, title, epubVersion)
 import qualified BookIndexer.Types.BookInfo as BI (token)
-import CouchDB.Types.Auth (Auth(NoAuth, BasicAuth))
-import CouchDB.Types.Seq (Seq)
 import Common.BooksDirectoryInfo (BooksDirectoryInfo, booksDirectoryInfoId, booksItemId, readItemId, defaultBooksDirectoryInfo)
 import Common.Database (usersDatabaseName, indexerDatabaseName, userDatabaseName, usersFilter)
 import qualified Common.Onedrive as OD (getOnedriveClientSecret)
@@ -34,6 +29,11 @@ import Control.Monad.Reader.Class (MonadReader(ask))
 import Control.Monad.State (runStateT)
 import Control.Monad.State.Class (MonadState(get, put))
 import Control.Monad.Trans.Maybe (runMaybeT, MaybeT(MaybeT))
+import CouchDB.Changes.Watcher (watchChanges, WatchParams(..), DocumentChange)
+import qualified CouchDB.Changes.Watcher as W (_id)
+import CouchDB.Requests (getObject, putObject)
+import CouchDB.Types.Auth (Auth(NoAuth, BasicAuth))
+import CouchDB.Types.Seq (Seq)
 import Data.ByteString.Char8 (ByteString, pack)
 import Data.Conduit (($$), (=$=))
 import qualified Data.Conduit.Combinators as DC (last, mapM_, concatMapM)
@@ -90,7 +90,7 @@ watchNewUsersLoop userSynchronizers auth ls = do
       , _since = ls
       , _filter = Just usersFilter
       }
-  watchChanges watchParams (DC.concatMapM (processWatchItem userSynchronizers auth) =$= DC.last) -- TODO: catch exceptions
+  watchChanges auth watchParams (DC.concatMapM (processWatchItem userSynchronizers auth) =$= DC.last) -- TODO: catch exceptions
 
 
 processWatchItem :: (MonadIO m
@@ -202,10 +202,12 @@ synchronizeUserLoop auth userInfo = do
               BM.author <$> bookMetadata
             t =
               BM.title <$> bookMetadata
+            v =
+              BM.epubVersion <$> bookMetadata
             defaultBook =
-              BookInfo bookInfoId Nothing isRead bookInfoToken a t
+              BookInfo bookInfoId Nothing isRead bookInfoToken a t v
             updateBook =
-              set BI.token bookInfoToken . set read_ isRead . set author a . set title t
+              set BI.token bookInfoToken . set read_ isRead . set author a . set title t . set epubVersion v
           newBook <- maybe defaultBook updateBook <$> getObject couchdb userDatabaseId auth itemId
           putObject couchdb userDatabaseId auth itemId newBook
 

@@ -137,6 +137,7 @@ component =
       , author: fromMaybe "Unknown Author" t.author
       , isRead: t.read
       , id: t._id
+      , epubVersion: t.epubVersion
       }
 
 
