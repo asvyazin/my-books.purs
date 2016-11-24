@@ -138,6 +138,7 @@ component =
       , isRead: t.read
       , id: t._id
       , epubVersion: t.epubVersion
+      , viewEpubUrl: ("/view-epub/" <> _) <$> t.onedriveId
       }
 
 

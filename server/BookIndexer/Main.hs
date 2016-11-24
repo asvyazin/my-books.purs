@@ -5,7 +5,7 @@ module Main (main) where
 
 import qualified BookIndexer.BookMetadataReader as BM (loadMetadata, BookMetadata(author, title, epubVersion))
 import BookIndexer.IndexerState (IndexerState(IndexerState), lastSeq, indexerStateId)
-import BookIndexer.Types.BookInfo (BookInfo(BookInfo), read_, author, title, epubVersion)
+import BookIndexer.Types.BookInfo (BookInfo(BookInfo), read_, author, title, epubVersion, onedriveId)
 import qualified BookIndexer.Types.BookInfo as BI (token)
 import Common.BooksDirectoryInfo (BooksDirectoryInfo, booksDirectoryInfoId, booksItemId, readItemId, defaultBooksDirectoryInfo)
 import Common.Database (usersDatabaseName, indexerDatabaseName, userDatabaseName, usersFilter)
@@ -205,9 +205,9 @@ synchronizeUserLoop auth userInfo = do
             v =
               BM.epubVersion <$> bookMetadata
             defaultBook =
-              BookInfo bookInfoId Nothing isRead bookInfoToken a t v
+              BookInfo bookInfoId Nothing isRead bookInfoToken a t v (Just currentId)
             updateBook =
-              set BI.token bookInfoToken . set read_ isRead . set author a . set title t . set epubVersion v
+              set BI.token bookInfoToken . set read_ isRead . set author a . set title t . set epubVersion v . set onedriveId (Just currentId)
           newBook <- maybe defaultBook updateBook <$> getObject couchdb userDatabaseId auth itemId
           putObject couchdb userDatabaseId auth itemId newBook
 

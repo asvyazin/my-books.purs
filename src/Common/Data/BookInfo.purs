@@ -17,6 +17,7 @@ newtype BookInfo =
   , author :: Maybe String
   , title :: Maybe String
   , epubVersion :: Maybe String
+  , onedriveId :: Maybe String
   }
 
 
@@ -29,4 +30,5 @@ instance decodeJsonBookInfo :: DecodeJson BookInfo where
     author <- o .?? "author"
     title <- o .?? "title"
     epubVersion <- o .?? "epubVersion"
-    pure $ BookInfo { _id, _rev, read, author, title, epubVersion }
+    onedriveId <- o .?? "onedriveId"
+    pure $ BookInfo { _id, _rev, read, author, title, epubVersion, onedriveId }

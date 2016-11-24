@@ -3,7 +3,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
-module BookIndexer.Types.BookInfo (BookInfo(..), id_, rev, read_, token, author, title, epubVersion) where
+module BookIndexer.Types.BookInfo (BookInfo(..), id_, rev, read_, token, author, title, epubVersion, onedriveId) where
 
 
 import Control.Lens (makeLensesWith, camelCaseFields, (^.))
@@ -21,6 +21,7 @@ data BookInfo =
   , bookInfoAuthor :: Maybe Text
   , bookInfoTitle :: Maybe Text
   , bookInfoEpubVersion :: Maybe Text
+  , bookInfoOnedriveId :: Maybe Text
   }
 
 
@@ -29,7 +30,7 @@ makeLensesWith camelCaseFields ''BookInfo
 
 instance FromJSON BookInfo where
   parseJSON = withObject "Invalid BookInfo JSON" $ \o ->
-    BookInfo <$> o .: "_id" <*> o .: "_rev" <*> o .: "read" <*> o .: "token" <*> o .:? "author" <*> o .:? "title" <*> o .:? "epubVersion"
+    BookInfo <$> o .: "_id" <*> o .: "_rev" <*> o .: "read" <*> o .: "token" <*> o .:? "author" <*> o .:? "title" <*> o .:? "epubVersion" <*> o .:? "onedriveId"
 
 
 instance ToJSON BookInfo where
@@ -42,4 +43,5 @@ instance ToJSON BookInfo where
               , ("author" .=) <$> (b ^. author)
               , ("title" .=) <$> (b ^. title)
               , ("epubVersion" .=) <$> (b ^. epubVersion)
+              , ("onedriveId" .=) <$> (b ^. onedriveId)
               ]
