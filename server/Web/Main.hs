@@ -1,5 +1,5 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Main (main) where
 
 
@@ -11,6 +11,7 @@ import Control.Concurrent (forkIO)
 import Control.Lens ((^.), set)
 import Control.Monad (when, void)
 import Control.Monad.Catch (MonadThrow)
+import Control.Monad.Except (runExceptT)
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Maybe (runMaybeT, MaybeT(MaybeT))
@@ -19,12 +20,14 @@ import CouchDB.Types.Auth (Auth(NoAuth, BasicAuth))
 import Data.ByteString.Char8 (ByteString, pack)
 import Data.Maybe (fromJust, fromMaybe)
 import Data.Monoid ((<>))
-import qualified Data.Text as T (Text, concat)
+import qualified Data.Text as T (Text, concat, empty)
 import qualified Data.Text.Encoding as T (decodeUtf8)
 import qualified Data.Text.Lazy as TL
+import Network.HTTP.Types.Status (unauthorized401)
 import Network.Wai (queryString)
 import qualified Network.Wai.Middleware.Static as Wai
 import Onedrive.Auth (requestToken)
+import Onedrive.Items (content)
 import Onedrive.Session (newSessionWithToken)
 import Onedrive.Types.OauthTokenRequest (OauthTokenRequest(OauthTokenRequest))
 import qualified Onedrive.Types.OauthTokenResponse as Resp (OauthTokenResponse, refreshToken, accessToken)
@@ -50,6 +53,7 @@ import qualified Text.Blaze.Html5 as H (Html,
                                         div,
                                         toValue)
 import qualified Text.Blaze.Html5.Attributes as HA
+import Web.Routing.Combinators (wildcard)
 import Web.Spock.Core (runSpock,
                        spockT,
                        get,
@@ -58,10 +62,18 @@ import Web.Spock.Core (runSpock,
                        html,
                        request,
                        setCookie,
+                       cookie,
                        defaultCookieSettings,
                        json,
                        hookAny,
+                       subcomponent,
+                       setHeader,
+                       setStatus,
+                       bytes,
+                       var,
+                       (<//>),
                        StdMethod(GET))
+import Web.ViewEpub (loadEpubItem, itemBytes, contentType, firstPagePath)
 
 
 main :: IO ()
@@ -72,7 +84,7 @@ main = do
   runSpock port $ spockT id $ do
     currentDirectory <- liftIO getCurrentDirectory
     middleware $ Wai.staticPolicy (Wai.addBase (currentDirectory </> "public"))
-  
+
     get "onedrive-redirect" $ do
       qs <- queryString <$> request
       let c = pa "code" qs
@@ -85,6 +97,34 @@ main = do
 
     get "server-environment" $
       json serverEnvironment
+
+    subcomponent "view-epub" $
+      get (var <//> wildcard) $ \itemId path -> do
+      liftIO $ print itemId
+      liftIO $ print path
+      mbAccessToken <- cookie "onedriveToken"
+      case mbAccessToken of
+        Nothing ->
+          setStatus unauthorized401
+        Just accessToken -> do
+          session <- liftIO $ newSessionWithToken accessToken
+          bs <- liftIO $ content session itemId
+          if path == T.empty
+            then do
+            result <- liftIO $ runExceptT $ firstPagePath bs
+            case result of
+              Right indexPath ->
+                redirect $ "/view-epub/" <> itemId <> "/" <> indexPath
+              Left err ->
+                fail $ "Error getting EPUB index item: " ++ err
+            else do
+            result <- liftIO $ runExceptT $ loadEpubItem bs path
+            case result of
+              Right res -> do
+                setHeader "Content-Type" $ res ^. contentType
+                bytes $ res ^. itemBytes
+              Left err ->
+                fail $ "Error getting EPUB item: " ++ err
 
     hookAny GET $ \_ ->
       html $ renderHtml appPage
@@ -123,8 +163,8 @@ withMaster mainScript childrenMarkup = H.docTypeHtml $ do
 
 
 ie10comment :: H.Html -> H.Html
-ie10comment htmlContent = H.textComment $ T.concat ["[if lt IE 10]>", content, "<![endif]"]
-  where content = renderHtml htmlContent
+ie10comment htmlContent = H.textComment $ T.concat ["[if lt IE 10]>", renderedContent, "<![endif]"]
+  where renderedContent = renderHtml htmlContent
 
 
 getPort :: IO Int

@@ -19,7 +19,8 @@ executable MyBooks
                        Common.HTTPHelper,
                        Common.Onedrive,
                        Common.OnedriveInfo,
-                       Common.ServerEnvironmentInfo
+                       Common.ServerEnvironmentInfo,
+                       Web.ViewEpub
   -- other-extensions:    
   build-depends:       aeson,
                        attoparsec,
@@ -30,6 +31,7 @@ executable MyBooks
                        conduit,
                        conduit-extra,
                        directory,
+                       epub-metadata,
                        errors,
                        filepath,
                        http-conduit,
@@ -42,11 +44,13 @@ executable MyBooks
                        monad-control,
                        mtl,
                        optparse-applicative,
+                       reroute,
                        Spock-core,
                        text,
                        transformers,
                        wai,
-                       wai-middleware-static
+                       wai-middleware-static,
+                       zip-archive
   hs-source-dirs:      server
   default-language:    Haskell2010
 
