@@ -230,7 +230,7 @@ wrapFormGroup controlId =
     wrapRender origRender dispatch p s c =
       let
         fg =
-          maybe (FormGroup.formGroup {}) (\c -> FormGroup.formGroup { controlId: c }) controlId
+          maybe (FormGroup.formGroup {}) (\cc -> FormGroup.formGroup { controlId: cc }) controlId
       in
         [ fg $ origRender dispatch p s c ]
 

@@ -212,7 +212,7 @@ unwrapChildAction :: Action -> Tuple (Maybe String) Action
 unwrapChildAction action =
   unwrapRec action Nothing
   where
-    unwrapRec (ChildAction (Tuple childItemId action)) _ =
-      unwrapRec action childItemId
-    unwrapRec action itemId =
-      Tuple itemId action
+    unwrapRec (ChildAction (Tuple childItemId act)) _ =
+      unwrapRec act childItemId
+    unwrapRec act itemId =
+      Tuple itemId act
