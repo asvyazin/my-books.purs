@@ -27,7 +27,7 @@ export default {
 	}, {
 	    test: /\.js$/,
 	    exclude: /(node_modules|bower_components)/,
-	    loader: 'babel'
+	    loader: 'babel-loader'
 	}, {
 	    test: /\.css$/,
 	    loader: "style-loader!css-loader"
@@ -40,7 +40,7 @@ export default {
 	}]
     },
     resolve: {
-	modulesDirectories: modulesDirectories
+	modules: modulesDirectories
     },
     devtool: 'source-map'
 };
