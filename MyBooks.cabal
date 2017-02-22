@@ -49,6 +49,7 @@ executable MyBooks
                        text,
                        transformers,
                        wai,
+                       wai-extra,
                        wai-middleware-static,
                        zip-archive
   hs-source-dirs:      server

@@ -25,7 +25,8 @@ import qualified Data.Text.Encoding as T (decodeUtf8)
 import qualified Data.Text.Lazy as TL
 import Network.HTTP.Types.Status (unauthorized401)
 import Network.Wai (queryString)
-import qualified Network.Wai.Middleware.Static as Wai
+import Network.Wai.Middleware.RequestLogger (logStdoutDev)
+import Network.Wai.Middleware.Static (staticPolicy, addBase)
 import Onedrive.Auth (requestToken)
 import Onedrive.Items (content)
 import Onedrive.Session (newSessionWithToken)
@@ -81,8 +82,9 @@ main = do
   onedriveClientSecret <- getOnedriveClientSecret
   serverEnvironment <- getServerEnvironment
   runSpock port $ spockT id $ do
+    middleware logStdoutDev
     currentDirectory <- liftIO getCurrentDirectory
-    middleware $ Wai.staticPolicy (Wai.addBase (currentDirectory </> "public"))
+    middleware $ staticPolicy (addBase (currentDirectory </> "public"))
 
     get "onedrive-redirect" $ do
       qs <- queryString <$> request
