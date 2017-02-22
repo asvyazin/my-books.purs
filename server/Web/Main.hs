@@ -66,7 +66,6 @@ import Web.Spock.Core (runSpock,
                        defaultCookieSettings,
                        json,
                        hookAny,
-                       subcomponent,
                        setHeader,
                        setStatus,
                        bytes,
@@ -98,33 +97,33 @@ main = do
     get "server-environment" $
       json serverEnvironment
 
-    subcomponent "view-epub" $
-      get (var <//> wildcard) $ \itemId path -> do
-      liftIO $ print itemId
-      liftIO $ print path
-      mbAccessToken <- cookie "onedriveToken"
-      case mbAccessToken of
-        Nothing ->
-          setStatus unauthorized401
-        Just accessToken -> do
-          session <- liftIO $ newSessionWithToken accessToken
-          bs <- liftIO $ content session itemId
-          if path == T.empty
-            then do
-            result <- liftIO $ runExceptT $ firstPagePath bs
-            case result of
-              Right indexPath ->
-                redirect $ "/view-epub/" <> itemId <> "/" <> indexPath
-              Left err ->
-                fail $ "Error getting EPUB index item: " ++ err
-            else do
-            result <- liftIO $ runExceptT $ loadEpubItem bs path
-            case result of
-              Right res -> do
-                setHeader "Content-Type" $ res ^. contentType
-                bytes $ res ^. itemBytes
-              Left err ->
-                fail $ "Error getting EPUB item: " ++ err
+    get ("view-epub" <//> var <//> wildcard) $ \itemId path -> do
+                                liftIO $ print itemId
+                                liftIO $ print path
+                                mbAccessToken <- cookie "onedriveToken"
+                                case mbAccessToken of
+                                  Nothing ->
+                                    setStatus unauthorized401
+                                  Just accessToken -> do
+                                    session <- liftIO $ newSessionWithToken accessToken
+                                    bs <- liftIO $ content session itemId
+                                    if path == T.empty
+                                      then do
+                                      result <- liftIO $ runExceptT $ firstPagePath bs
+                                      case result of
+                                        Right indexPath ->
+                                          redirect $ "/view-epub/" <> itemId <> "/" <> indexPath
+                                        Left err ->
+                                          fail $ "Error getting EPUB index item: " ++ err
+                                      else do
+                                      result <- liftIO $ runExceptT $ loadEpubItem bs path
+                                      case result of
+                                        Right res -> do
+                                          setHeader "Content-Type" $ res ^. contentType
+                                          bytes $ res ^. itemBytes
+                                        Left err ->
+                                          fail $ "Error getting EPUB item: " ++ err
+
 
     hookAny GET $ \_ ->
       html $ renderHtml appPage
