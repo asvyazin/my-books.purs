@@ -12,7 +12,7 @@ import Network.HTTP.StatusCode (StatusCode(..))
 import Prelude
 
 
-doJsonRequest :: forall e a. (DecodeJson a) => AffjaxRequest Unit -> Aff (ajax :: AJAX | e) a
+doJsonRequest :: forall e a. DecodeJson a => AffjaxRequest Unit -> Aff (ajax :: AJAX | e) a
 doJsonRequest req =
   affjax req >>= getJson
 
