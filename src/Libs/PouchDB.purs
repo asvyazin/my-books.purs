@@ -2,17 +2,17 @@ module Libs.PouchDB where
 
 
 import Control.Monad.Aff (Aff, makeAff)
-import Control.Monad.Eff (Eff)
+import Control.Monad.Eff (Eff, kind Effect)
 import Control.Monad.Eff.Exception (Error)
 import Data.Foreign (Foreign, unsafeFromForeign, isNull)
 import Data.Maybe (Maybe(..))
 import Prelude
 
 
-foreign import data POUCHDB :: !
+foreign import data POUCHDB :: Effect
 
 
-foreign import data PouchDB :: *
+foreign import data PouchDB :: Type
 
 
 type PouchDBEff e a =
@@ -75,7 +75,7 @@ tryGet db docId = do
          else Just $ unsafeFromForeign foreignResult
 
 
-foreign import data PouchDBSync :: *
+foreign import data PouchDBSync :: Type
 
 
 foreign import sync :: forall srcType destType optionsType e. srcType -> destType -> optionsType -> PouchDBEff e PouchDBSync

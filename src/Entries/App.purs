@@ -3,7 +3,7 @@ module Entries.App where
 
 import Control.Monad.Eff (Eff)
 import Data.Maybe (Maybe(Nothing, Just))
-import Data.Nullable (toMaybe)
+import Data.Newtype (wrap)
 import DOM (DOM)
 import DOM.HTML (window)
 import DOM.HTML.Types (htmlDocumentToParentNode)
@@ -18,7 +18,7 @@ import ReactDOM (render) as R
 main :: Eff (dom :: DOM) Unit
 main = do
   node <- htmlDocumentToParentNode <$> (window >>= document)
-  maybeContainer <- toMaybe <$> querySelector ".application" node
+  maybeContainer <- querySelector (wrap ".application") node
   case maybeContainer of
     Nothing ->
       pure unit

@@ -8,7 +8,7 @@ foreign import routerFFI :: forall props. R.ReactClass props
 foreign import routeFFI :: forall props. R.ReactClass props
 foreign import linkFFI :: forall props. R.ReactClass props
 
-foreign import data History :: *
+foreign import data History :: Type
 foreign import hashHistory :: History
 foreign import browserHistory :: History
 

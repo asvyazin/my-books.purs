@@ -17,7 +17,7 @@ doJsonRequest req =
   affjax req >>= getJson
 
 
-getJson :: forall m a. (DecodeJson a, MonadError Error m) => AffjaxResponse String -> m a
+getJson :: forall m a. DecodeJson a => MonadError Error m => AffjaxResponse String -> m a
 getJson resp = do
   when (resp.status /= StatusCode 200) $
     throwError $ error "AJAX request failed"
