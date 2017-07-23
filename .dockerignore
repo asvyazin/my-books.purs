@@ -6,5 +6,7 @@ dist
 public
 tmp
 .stack-work
+server/hs-couchdb/.stack-work
+server/hs-onedrive/.stack-work
+.git
 couchapps
-docker
