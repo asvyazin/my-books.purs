@@ -15,6 +15,8 @@ import Data.Aeson (Value)
 import Data.ByteString.Char8 (unpack, pack, ByteString)
 import Data.CaseInsensitive (CI(original))
 import Data.List (find)
+import Data.Maybe (fromMaybe)
+import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T (unpack)
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
@@ -44,14 +46,15 @@ import Web.Spock.Core (hookAny, runSpock, spockT, StdMethod(GET, POST, PUT, DELE
 main :: IO ()
 main = do
   port <- getPort
+  couchdbServer <- getCouchdbServer
   runSpock port $ spockT id $ do
-    hookAny GET processRequest
-    hookAny POST processRequest
-    hookAny PUT processRequest
-    hookAny DELETE processRequest
-    hookAny OPTIONS processRequest
+    hookAny GET $ processRequest couchdbServer
+    hookAny POST $ processRequest couchdbServer
+    hookAny PUT $ processRequest couchdbServer
+    hookAny DELETE $ processRequest couchdbServer
+    hookAny OPTIONS $ processRequest couchdbServer
     where
-      processRequest _ = do
+      processRequest couchdbServer _ = do
         req <- request
         let
           headers = requestHeaders req
@@ -67,7 +70,7 @@ main = do
             setRequestPath (rawPathInfo req) $
             setRequestMethod method $
             setRequestSecure False $
-            setRequestHost "localhost" $
+            setRequestHost couchdbServer $
             setRequestPort 5984 $
             setRequestHeaders newHeaders defaultRequest
         resp <- httpLBS newRequest
@@ -95,6 +98,11 @@ main = do
 getPort :: IO Int
 getPort =
   maybe 8001 read <$> lookupEnv "PROXY_PORT"
+
+
+getCouchdbServer :: IO ByteString
+getCouchdbServer =
+  (pack . fromMaybe "localhost") <$> lookupEnv "COUCHDB_SERVER"
 
 
 onedriveTokenHeaderName :: HeaderName
@@ -128,13 +136,14 @@ getUserIdByToken tokenBS = do
 tryGetUserIdFromCouchDB :: Text -> IO (Maybe Text)
 tryGetUserIdFromCouchDB token = do
   auth <- getAuth
+  proxyServer <- proxyServerName
   let
     params =
       set key (Just token) $
       set limit (Just 1)
       defaultViewQueryParameters
     loadViewResult :: IO (ViewResult Text Value)
-    loadViewResult = getView proxyCouchDBServer proxyDatabaseName auth "users" "by-token" params
+    loadViewResult = getView proxyServer proxyDatabaseName auth "users" "by-token" params
   res <- loadViewResult
   case res ^. rows of
     [] ->
@@ -148,13 +157,14 @@ tryGetUserIdFromCouchDB token = do
 putUserIdToCouchDB :: Text -> Text -> IO ()
 putUserIdToCouchDB token userId = do
   auth <- getAuth
-  oldObj <- getObject proxyCouchDBServer proxyDatabaseName auth userId
+  proxyServer <- proxyServerName
+  oldObj <- getObject proxyServer proxyDatabaseName auth userId
   let
     rev =
       oldObj >>= userTokenRev
     obj =
       UserToken userId rev token
-  putObject proxyCouchDBServer proxyDatabaseName auth userId obj
+  putObject proxyServer proxyDatabaseName auth userId obj
 
 
 getAuth :: IO Auth
@@ -172,17 +182,22 @@ tryGetAdminAuth = runMaybeT $ do
   return (pack username, pack password)
 
 
-proxyCouchDBServer :: Text
-proxyCouchDBServer =
-  "http://localhost:5984"
-
-
 proxyDatabaseName :: Text
 proxyDatabaseName =
   "my-books-proxy"
 
 
+proxyServerPort :: Text
+proxyServerPort = "5984"
+
+
+proxyServerName :: IO Text
+proxyServerName = do
+  serverHost <- getCouchdbServer
+  pure $ "http://" <> decodeUtf8 serverHost <> ":" <> proxyServerPort
+
+
 getUserByToken :: ByteString -> IO UserInfo
 getUserByToken tokenBS = do
   session <- newSessionWithToken $ decodeUtf8 tokenBS
-  me session 
+  me session

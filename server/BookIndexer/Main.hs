@@ -19,15 +19,14 @@ import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TVar (newTVar, modifyTVar, TVar)
 import Control.Error.Util (hoistMaybe)
 import Control.Exception.Base (SomeException)
-import Control.Lens ((^.), view, set, _Just)
-import Control.Monad (void, unless, when)
+import Control.Lens ((^.), view, set)
+import Control.Monad (void, when)
 import Control.Monad.Catch (MonadThrow(throwM), MonadCatch(catch), MonadMask)
 import Control.Monad.Except (runExceptT)
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Reader (runReaderT)
 import Control.Monad.Reader.Class (MonadReader(ask))
 import Control.Monad.State (runStateT)
-import Control.Monad.State.Class (MonadState(get, put))
 import Control.Monad.Trans.Maybe (runMaybeT, MaybeT(MaybeT))
 import CouchDB.Changes.Watcher (watchChanges, WatchParams(..), DocumentChange)
 import qualified CouchDB.Changes.Watcher as W (_id)
@@ -39,10 +38,11 @@ import Data.Conduit (($$), (=$=))
 import qualified Data.Conduit.Combinators as DC (last, mapM_, concatMapM)
 import Data.Maybe (fromJust, isNothing, maybe, fromMaybe)
 import Data.Monoid ((<>))
-import qualified Data.Set as S (Set, member, insert, singleton)
+import qualified Data.Set as S (singleton)
 import Data.Text (Text)
 import Onedrive.Auth (requestRefreshToken)
 import Onedrive.FolderChangesReader (newFolderChangesReader, enumerateChanges)
+import Onedrive.Items (item)
 import Onedrive.Session (newSessionWithRenewableToken, Session)
 import qualified Onedrive.Types.ItemReference as IR (id_)
 import Onedrive.Types.OnedriveItem (name, id_, parentReference, OnedriveItem, folder)
@@ -141,7 +141,7 @@ synchronizeUserLoop auth userInfo = do
   liftIO $ putStrLn $ "Token: " ++ show tok
   liftIO $ putStrLn $ "Refresh token: " ++ show refreshTok
   liftIO $ putStrLn $ "Books itemId: " ++ show booksFolder
-  session <- liftIO $ newSessionWithRenewableToken tok (runReaderT (renewToken refreshTok) serverEnv)
+  session <- liftIO $ newSessionWithRenewableToken tok $ renewToken refreshTok serverEnv
   onedriveReader <- newFolderChangesReader session booksFolder Nothing
   let
     loop =
@@ -150,9 +150,8 @@ synchronizeUserLoop auth userInfo = do
       (S.singleton readFolder, S.singleton booksFolder)
   void (runStateT loop startState) `catch` logError
   where
-    renewToken tok = do
+    renewToken tok env = do
       secret <- liftIO OD.getOnedriveClientSecret
-      env <- ask
       let
         req =
           OauthTokenRequest (env ^. onedriveClientId) ((env ^. appBaseUrl) <> "/onedrive-redirect") secret
@@ -164,9 +163,7 @@ synchronizeUserLoop auth userInfo = do
       liftIO $ print e
       throwM e
 
-    processItem :: (MonadThrow m
-                   , MonadIO m
-                   , MonadState (S.Set Text, S.Set Text) m) => Session -> Text -> BooksDirectoryInfo -> OnedriveItem -> m ()
+    processItem :: MonadThrow m => MonadIO m => Session -> Text -> BooksDirectoryInfo -> OnedriveItem -> m ()
     processItem session couchdb booksDirectoryInfo i = do
       let
         currentId =
@@ -174,9 +171,6 @@ synchronizeUserLoop auth userInfo = do
 
         filename =
           i ^. name
-
-        parentItemId =
-          i ^. parentReference . _Just . IR.id_
 
         isFile =
           isNothing $ i ^. folder
@@ -211,31 +205,19 @@ synchronizeUserLoop auth userInfo = do
           newBook <- maybe defaultBook updateBook <$> getObject couchdb userDatabaseId auth itemId
           putObject couchdb userDatabaseId auth itemId newBook
 
-      (readSet, processedSet) <- get
-      unless (S.member currentId processedSet) $ do
-        unless (S.member parentItemId processedSet) $
-          liftIO $ putStrLn $ "Parent itemId not found: " ++ show parentItemId
-        when isFile $ do
-          let
-            isRead =
-              S.member parentItemId readSet
-            prefix =
-              if isRead then "Read" else "Not read"
-          result <- runExceptT $ BM.loadMetadata session filename currentId
-          case result of
-            Right bookMetadata ->
-              createOrUpdateBookInfo bookInfoId isRead bookMetadata
-            Left str ->
-              liftIO $ putStrLn $ "error reading EPUB file: " ++ str
-          liftIO $ putStrLn $ prefix ++ ": " ++ show filename
+      when isFile $ do
+        isRead <- isReadItem session readFolder i
         let
-          newProcessedSet =
-            S.insert currentId processedSet
-          newReadSet =
-            if S.member parentItemId readSet
-            then S.insert currentId readSet
-            else readSet
-        put (newReadSet, newProcessedSet)
+          prefix =
+            if isRead then "Read" else "Not read"
+        result <- runExceptT $ BM.loadMetadata session filename currentId
+        case result of
+          Right bookMetadata ->
+            createOrUpdateBookInfo bookInfoId isRead bookMetadata
+          Left str ->
+            liftIO $ putStrLn $ "error reading EPUB file: " ++ str
+        liftIO $ putStrLn $ prefix ++ ": " ++ show filename
+
       return ()
 
 
@@ -252,3 +234,20 @@ tryGetAdminAuth = runMaybeT $ do
   username <- MaybeT $ lookupEnv "COUCHDB_ADMIN_USERNAME"
   password <- MaybeT $ lookupEnv "COUCHDB_ADMIN_PASSWORD"
   return (pack username, pack password)
+
+
+isReadItem :: MonadThrow m => MonadIO m => Session -> Text -> OnedriveItem -> m Bool
+isReadItem session readFolderId i = fromMaybe False <$> runMaybeT isReadItem'
+  where isReadItem' = do
+          let itemId = i ^. id_
+          if itemId == readFolderId
+             then pure True
+             else do
+                  parentRef <- hoistMaybe $ i ^. parentReference
+                  let parentItemId =
+                        parentRef ^. IR.id_
+                  if parentItemId == readFolderId
+                     then pure True
+                     else do
+                          parentItem <- item session parentItemId
+                          isReadItem session readFolderId parentItem
