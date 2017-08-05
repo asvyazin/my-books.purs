@@ -13,3 +13,5 @@ tmp
 .stack-work
 .env
 psc.tix
+data
+docker/**/result

@@ -52,7 +52,7 @@ executable MyBooks
                        wai-extra,
                        wai-middleware-static,
                        zip-archive
-  hs-source-dirs:      server
+  hs-source-dirs:      .
   default-language:    Haskell2010
 
 executable BookIndexer
@@ -92,7 +92,7 @@ executable BookIndexer
                                 stm,
                                 text,
                                 transformers
-           hs-source-dirs:      server
+           hs-source-dirs:      .
            default-language:    Haskell2010
 
 executable CouchAuthProxy
@@ -113,5 +113,5 @@ executable CouchAuthProxy
                                 text,
                                 transformers,
                                 wai
-           hs-source-dirs:      server
+           hs-source-dirs:      .
            default-language:    Haskell2010
