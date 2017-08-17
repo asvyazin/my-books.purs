@@ -4,8 +4,8 @@ let
 
   inherit (nixpkgs) pkgs;
   
-  couchdb = import ../hs-couchdb/shell.nix { };
-  onedrive = import ../hs-onedrive/shell.nix { };
+  couchdb = import ../hs-couchdb/project.nix { };
+  onedrive = import ../hs-onedrive/project.nix { };
   
   f = { mkDerivation, aeson, async, attoparsec, base, blaze-builder
       , blaze-html, blaze-markup, bytestring, case-insensitive, conduit
